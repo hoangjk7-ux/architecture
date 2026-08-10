@@ -260,6 +260,7 @@ const translations: TranslationMap = {
   "systems.col.system": { vi: "Hệ thống", en: "System" },
   "systems.col.typeCategory": { vi: "Loại / Danh mục", en: "Type / Category" },
   "systems.col.owner": { vi: "Chủ sở hữu", en: "Owner" },
+  "systems.col.governingDepartment": { vi: "Phòng ban quản trị", en: "Governing Department" },
   "systems.col.vendor": { vi: "Nhà cung cấp", en: "Vendor" },
   "systems.col.risk": { vi: "Rủi ro", en: "Risk" },
   "systems.col.scores": { vi: "Điểm số", en: "Scores" },

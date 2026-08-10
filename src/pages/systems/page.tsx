@@ -1148,7 +1148,10 @@ function SystemsContent() {
       if (
         search &&
         !s.name.toLowerCase().includes(search.toLowerCase()) &&
-        !s.category.toLowerCase().includes(search.toLowerCase())
+        !s.category.toLowerCase().includes(search.toLowerCase()) &&
+        !s.departments.some((department) =>
+          department.toLowerCase().includes(search.toLowerCase()),
+        )
       )
         return false;
       if (filterStatus !== "all" && s.status !== filterStatus) return false;
@@ -1452,7 +1455,7 @@ function SystemsContent() {
                       {[
                         t("systems.col.system"),
                         t("systems.col.typeCategory"),
-                        t("systems.col.owner"),
+                        t("systems.col.governingDepartment"),
                         t("systems.col.vendor"),
                         t("systems.col.risk"),
                         t("systems.col.scores"),
@@ -1514,8 +1517,22 @@ function SystemsContent() {
                             </div>
                           </td>
                           <td className="p-3 hidden md:table-cell">
-                            {s.owner ? (
-                              <span className="text-xs">{s.owner}</span>
+                            {s.departments.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {s.departments.slice(0, 2).map((department) => (
+                                  <span
+                                    key={department}
+                                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-foreground"
+                                  >
+                                    {department}
+                                  </span>
+                                ))}
+                                {s.departments.length > 2 && (
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    +{s.departments.length - 2}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-xs text-yellow-400 flex items-center gap-1">
                                 <UserX className="h-3 w-3" />
