@@ -221,7 +221,7 @@ interface NodeData {
   worstHealth: string;
   isSelected: boolean;
   isCentral: boolean;
-  groupKey: EcosystemGroupKey;
+  groupKey: SystemZoneKey;
 }
 
 interface ZoneNodeData {
@@ -740,6 +740,9 @@ type EcosystemGroupKey =
   | "platform"
   | "pilot"
   | "legacy";
+
+type SystemZoneKey = EcosystemGroupKey | "core";
+type ZoneFocus = SystemZoneKey | null;
 
 type EcosystemGroupConfig = {
   title: string;
@@ -2671,6 +2674,7 @@ function ArchitectureContent() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterHealth, setFilterHealth] = useState<string>("all");
   const [edgeFocus, setEdgeFocus] = useState<EdgeFocus>("all");
+  const [selectedZoneKey, setSelectedZoneKey] = useState<ZoneFocus>(null);
 
   const selectedSystem = useMemo(
     () => systems.find((s) => s._id === selectedId) ?? null,
@@ -2716,6 +2720,19 @@ function ArchitectureContent() {
     [filteredSystems],
   );
 
+  const systemGroupMap = useMemo(() => {
+    const groups = new globalThis.Map<string, ZoneFocus>();
+    systems.forEach((system) => {
+      groups.set(
+        system._id,
+        architectureLayout.centralIds.has(system._id)
+          ? "core"
+          : classifyEcosystemGroup(system),
+      );
+    });
+    return groups;
+  }, [systems, architectureLayout.centralIds]);
+
   const connectedNodeIds = useMemo(() => {
     if (!selectedId) return null;
     const ids = new Set<string>([selectedId]);
@@ -2725,6 +2742,39 @@ function ArchitectureContent() {
     });
     return ids;
   }, [selectedId, integrations]);
+
+  const focusedZoneIds = useMemo(() => {
+    if (!selectedZoneKey) return null;
+    const ids = new Set<string>();
+    systems.forEach((system) => {
+      if (systemGroupMap.get(system._id) === selectedZoneKey) {
+        ids.add(system._id);
+      }
+    });
+    return ids;
+  }, [selectedZoneKey, systems, systemGroupMap]);
+
+  const hubIdsConnectedToFocusedZone = useMemo(() => {
+    if (!focusedZoneIds) return new Set<string>();
+    const ids = new Set<string>();
+    integrations.forEach((integration) => {
+      const sourceInZone = focusedZoneIds.has(integration.sourceSystemId);
+      const targetInZone = focusedZoneIds.has(integration.destinationSystemId);
+      if (
+        sourceInZone &&
+        architectureLayout.centralIds.has(integration.destinationSystemId)
+      ) {
+        ids.add(integration.destinationSystemId);
+      }
+      if (
+        targetInZone &&
+        architectureLayout.centralIds.has(integration.sourceSystemId)
+      ) {
+        ids.add(integration.sourceSystemId);
+      }
+    });
+    return ids;
+  }, [focusedZoneIds, integrations, architectureLayout.centralIds]);
 
   const nodes: Node<ArchitectureNodeData>[] = useMemo(() => {
     const zoneNodes: Node<ZoneNodeData>[] = architectureLayout.zones.map(
@@ -2755,6 +2805,12 @@ function ArchitectureContent() {
         outCount: 0,
         worstHealth: "unknown",
       };
+      const isCentral = architectureLayout.centralIds.has(s._id);
+      const isInFocusedZone = focusedZoneIds?.has(s._id) ?? false;
+      const isFocusedHub =
+        selectedZoneKey &&
+        isCentral &&
+        (selectedZoneKey === "core" || hubIdsConnectedToFocusedZone.has(s._id));
       return {
         id: s._id,
         type: "system",
@@ -2765,17 +2821,23 @@ function ArchitectureContent() {
           outCount: metrics.outCount,
           worstHealth: metrics.worstHealth,
           isSelected: selectedId === s._id,
-          isCentral: architectureLayout.centralIds.has(s._id),
-          groupKey: classifyEcosystemGroup(s),
+          isCentral,
+          groupKey: systemGroupMap.get(s._id) ?? classifyEcosystemGroup(s),
         },
         style: {
           opacity: selectedId
             ? connectedNodeIds!.has(s._id)
               ? 1
               : 0.2
-            : filteredIds.has(s._id)
-              ? 1
-              : 0.2,
+            : selectedZoneKey
+              ? isInFocusedZone
+                ? 1
+                : isFocusedHub
+                  ? 0.9
+                  : 0.18
+              : filteredIds.has(s._id)
+                ? 1
+                : 0.2,
         },
       };
     });
@@ -2785,8 +2847,12 @@ function ArchitectureContent() {
     integrationMetrics,
     architectureLayout,
     selectedId,
+    selectedZoneKey,
     filteredIds,
     connectedNodeIds,
+    focusedZoneIds,
+    hubIdsConnectedToFocusedZone,
+    systemGroupMap,
   ]);
 
   const edges: Edge[] = useMemo(
@@ -2806,13 +2872,26 @@ function ArchitectureContent() {
         const isFiltered =
           filteredIds.has(intg.sourceSystemId) &&
           filteredIds.has(intg.destinationSystemId);
+        const sourceInZone = focusedZoneIds?.has(intg.sourceSystemId) ?? false;
+        const targetInZone =
+          focusedZoneIds?.has(intg.destinationSystemId) ?? false;
+        const isZoneToHubEdge =
+          (sourceInZone &&
+            architectureLayout.centralIds.has(intg.destinationSystemId)) ||
+          (targetInZone &&
+            architectureLayout.centralIds.has(intg.sourceSystemId));
+        const isZoneEdge = sourceInZone || targetInZone || isZoneToHubEdge;
         const edgeOpacity = selectedId
           ? isFocused && matchesEdgeFocus
             ? 1
             : 0.1
-          : isFiltered && matchesEdgeFocus
-            ? 0.9
-            : 0.1;
+          : selectedZoneKey
+            ? isZoneEdge && matchesEdgeFocus
+              ? 0.9
+              : 0.08
+            : isFiltered && matchesEdgeFocus
+              ? 0.9
+              : 0.1;
         return {
           id: intg._id,
           source: intg.sourceSystemId,
@@ -2847,7 +2926,15 @@ function ArchitectureContent() {
           },
         };
       }),
-    [integrations, selectedId, filteredIds, edgeFocus],
+    [
+      integrations,
+      selectedId,
+      selectedZoneKey,
+      filteredIds,
+      edgeFocus,
+      focusedZoneIds,
+      architectureLayout.centralIds,
+    ],
   );
 
   const healthSummary = useMemo(() => {
@@ -2895,6 +2982,12 @@ function ArchitectureContent() {
   const handleSetViewTab = (tab: ViewTab) => {
     setViewTab(tab);
     setSelectedId(null);
+    setSelectedZoneKey(null);
+  };
+
+  const handleSetSelectedZone = (zoneKey: SystemZoneKey) => {
+    setSelectedId(null);
+    setSelectedZoneKey((current) => (current === zoneKey ? null : zoneKey));
   };
 
   if (rawSystems === undefined || rawIntegrations === undefined) {
@@ -3033,6 +3126,14 @@ function ArchitectureContent() {
                 <X className="h-3 w-3" /> {t("common.clear")}
               </button>
             )}
+            {selectedZoneKey && (
+              <button
+                onClick={() => setSelectedZoneKey(null)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border border-orange-400/40 text-orange-200 hover:text-orange-100 cursor-pointer transition-colors"
+              >
+                <X className="h-3 w-3" /> Xoá cụm
+              </button>
+            )}
           </div>
         )}
 
@@ -3142,6 +3243,7 @@ function ArchitectureContent() {
                   proOptions={{ hideAttribution: true }}
                   onNodeClick={(_evt, node) => {
                     if (isZoneNodeId(node.id)) return;
+                    setSelectedZoneKey(null);
                     setSelectedId(node.id as Id<"software_systems">);
                   }}
                   onPaneClick={() => setSelectedId(null)}
@@ -3210,6 +3312,67 @@ function ArchitectureContent() {
                             architectureSummary.nonCompliantIntegrations +
                             architectureSummary.highDebtSystems}
                         </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 border-t border-slate-700/70 pt-2">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        Focus cụm
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => handleSetSelectedZone("core")}
+                          className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
+                          style={{
+                            borderColor:
+                              selectedZoneKey === "core"
+                                ? "#a78bfa"
+                                : "#334155",
+                            color:
+                              selectedZoneKey === "core"
+                                ? "#ddd6fe"
+                                : "#94a3b8",
+                            background:
+                              selectedZoneKey === "core"
+                                ? "#a78bfa22"
+                                : "transparent",
+                          }}
+                        >
+                          Trung tâm
+                        </button>
+                        {(
+                          Object.entries(ECOSYSTEM_GROUPS) as [
+                            EcosystemGroupKey,
+                            EcosystemGroupConfig,
+                          ][]
+                        ).map(([key, group]) => {
+                          const hasZone = architectureLayout.zones.some(
+                            (zone) => zone.id === `zone-${key}`,
+                          );
+                          if (!hasZone) return null;
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => handleSetSelectedZone(key)}
+                              className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
+                              style={{
+                                borderColor:
+                                  selectedZoneKey === key
+                                    ? group.accent
+                                    : "#334155",
+                                color:
+                                  selectedZoneKey === key
+                                    ? "#f8fafc"
+                                    : "#94a3b8",
+                                background:
+                                  selectedZoneKey === key
+                                    ? `${group.accent}26`
+                                    : "transparent",
+                              }}
+                            >
+                              {group.title.split(" & ")[0]}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
