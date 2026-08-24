@@ -222,6 +222,10 @@ interface NodeData {
   isSelected: boolean;
   isCentral: boolean;
   groupKey: SystemZoneKey;
+  isRiskMode: boolean;
+  riskTone: "high" | "medium" | "low" | "unknown";
+  riskColor: string;
+  riskLabel: string;
 }
 
 interface ZoneNodeData {
@@ -253,6 +257,27 @@ function scoreTone(value: number, goodAtHigh = true) {
     return value >= 70 ? "#22c55e" : value >= 50 ? "#f59e0b" : "#ef4444";
   }
   return value > 60 ? "#ef4444" : value > 30 ? "#f59e0b" : "#22c55e";
+}
+
+function riskToneForSystem(system: System, worstHealth: string) {
+  if (
+    system.riskLevel === "high" ||
+    system.technicalDebtScore >= 70 ||
+    worstHealth === "down"
+  ) {
+    return { tone: "high" as const, color: "#ef4444", label: "High risk" };
+  }
+  if (
+    system.riskLevel === "medium" ||
+    system.technicalDebtScore >= 40 ||
+    worstHealth === "degraded"
+  ) {
+    return { tone: "medium" as const, color: "#f59e0b", label: "Watch" };
+  }
+  if (worstHealth === "unknown") {
+    return { tone: "unknown" as const, color: "#64748b", label: "Unknown" };
+  }
+  return { tone: "low" as const, color: "#22c55e", label: "Stable" };
 }
 
 function systemIconFor(system: System) {
@@ -307,24 +332,44 @@ function SystemNode({ data }: NodeProps<NodeData>) {
     worstHealth,
     isSelected,
     isCentral,
+    isRiskMode,
+    riskTone,
+    riskColor,
+    riskLabel,
   } = data;
   const meta = TYPE_META[s.type] ?? TYPE_META.core;
   const statusMeta = STATUS_META[s.status] ?? STATUS_META.inactive;
   const healthColor = HEALTH_META[worstHealth]?.color ?? "#6b7280";
   const Icon = systemIconFor(s);
+  const nodeBorder = isRiskMode ? riskColor : meta.border;
+  const nodeBg = isRiskMode
+    ? riskTone === "high"
+      ? "#2a1015"
+      : riskTone === "medium"
+        ? "#251a08"
+        : riskTone === "low"
+          ? "#0f2318"
+          : "#111827"
+    : meta.bg;
   return (
     <div
       style={{
-        background: meta.bg,
+        background: nodeBg,
         borderRadius: 10,
         width: isCentral ? 220 : 176,
         cursor: "pointer",
-        border: `${isSelected ? "2.5px" : "1.5px"} solid ${isSelected ? "#fff" : meta.border}`,
+        border: `${isSelected ? "2.5px" : "1.5px"} solid ${isSelected ? "#fff" : nodeBorder}`,
         boxShadow: isSelected
           ? `0 0 0 3px ${meta.border}55, 0 4px 24px #0008`
-          : isCentral
-            ? `0 0 0 1px ${meta.border}66, 0 8px 30px ${meta.border}22`
-            : "0 2px 12px #0006",
+          : isRiskMode && riskTone === "high"
+            ? `0 0 0 2px ${riskColor}55, 0 0 28px ${riskColor}33`
+            : isRiskMode && riskTone === "medium"
+              ? `0 0 0 1px ${riskColor}44, 0 0 18px ${riskColor}22`
+              : isRiskMode
+                ? `0 0 0 1px ${riskColor}33, 0 2px 12px #0006`
+                : isCentral
+                  ? `0 0 0 1px ${meta.border}66, 0 8px 30px ${meta.border}22`
+                  : "0 2px 12px #0006",
         transition: "all 0.15s",
       }}
     >
@@ -385,6 +430,24 @@ function SystemNode({ data }: NodeProps<NodeData>) {
               }}
             >
               Hub
+            </span>
+          ) : null}
+          {isRiskMode ? (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                marginRight: 6,
+                padding: "1px 5px",
+                borderRadius: 999,
+                background: `${riskColor}33`,
+                color: "#fff",
+                fontSize: 8,
+                fontWeight: 700,
+              }}
+            >
+              {riskLabel}
             </span>
           ) : null}
           <span style={{ color: statusMeta.color }}>{statusMeta.icon}</span>{" "}
@@ -714,6 +777,7 @@ type IntegrationMetrics = {
 };
 
 type EdgeFocus = "all" | "critical" | "issues" | "nonCompliant" | "realtime";
+type MapMode = "ecosystem" | "risk";
 
 type ArchitectureZone = {
   id: string;
@@ -2674,6 +2738,7 @@ function ArchitectureContent() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterHealth, setFilterHealth] = useState<string>("all");
   const [edgeFocus, setEdgeFocus] = useState<EdgeFocus>("all");
+  const [mapMode, setMapMode] = useState<MapMode>("ecosystem");
   const [selectedZoneKey, setSelectedZoneKey] = useState<ZoneFocus>(null);
 
   const selectedSystem = useMemo(
@@ -2805,12 +2870,15 @@ function ArchitectureContent() {
         outCount: 0,
         worstHealth: "unknown",
       };
+      const riskTone = riskToneForSystem(s, metrics.worstHealth);
       const isCentral = architectureLayout.centralIds.has(s._id);
       const isInFocusedZone = focusedZoneIds?.has(s._id) ?? false;
       const isFocusedHub =
         selectedZoneKey &&
         isCentral &&
         (selectedZoneKey === "core" || hubIdsConnectedToFocusedZone.has(s._id));
+      const isRiskRelevant =
+        riskTone.tone === "high" || riskTone.tone === "medium";
       return {
         id: s._id,
         type: "system",
@@ -2823,6 +2891,10 @@ function ArchitectureContent() {
           isSelected: selectedId === s._id,
           isCentral,
           groupKey: systemGroupMap.get(s._id) ?? classifyEcosystemGroup(s),
+          isRiskMode: mapMode === "risk",
+          riskTone: riskTone.tone,
+          riskColor: riskTone.color,
+          riskLabel: riskTone.label,
         },
         style: {
           opacity: selectedId
@@ -2836,7 +2908,11 @@ function ArchitectureContent() {
                   ? 0.9
                   : 0.18
               : filteredIds.has(s._id)
-                ? 1
+                ? mapMode === "risk"
+                  ? isRiskRelevant
+                    ? 1
+                    : 0.45
+                  : 1
                 : 0.2,
         },
       };
@@ -2848,6 +2924,7 @@ function ArchitectureContent() {
     architectureLayout,
     selectedId,
     selectedZoneKey,
+    mapMode,
     filteredIds,
     connectedNodeIds,
     focusedZoneIds,
@@ -2866,6 +2943,16 @@ function ArchitectureContent() {
             ["degraded", "down"].includes(intg.healthStatus)) ||
           (edgeFocus === "nonCompliant" && !intg.isArchitectureCompliant) ||
           (edgeFocus === "realtime" && intg.method === "realtime");
+        const isRiskEdge =
+          intg.criticalLevel === "high" ||
+          ["degraded", "down"].includes(intg.healthStatus) ||
+          !intg.isArchitectureCompliant;
+        const matchesMapMode =
+          mapMode === "risk"
+            ? edgeFocus === "all"
+              ? isRiskEdge
+              : matchesEdgeFocus
+            : matchesEdgeFocus;
         const isFocused =
           selectedId === intg.sourceSystemId ||
           selectedId === intg.destinationSystemId;
@@ -2886,12 +2973,16 @@ function ArchitectureContent() {
             ? 1
             : 0.1
           : selectedZoneKey
-            ? isZoneEdge && matchesEdgeFocus
+            ? isZoneEdge && matchesMapMode
               ? 0.9
               : 0.08
-            : isFiltered && matchesEdgeFocus
-              ? 0.9
-              : 0.1;
+            : isFiltered && matchesMapMode
+              ? mapMode === "risk" && !isRiskEdge
+                ? 0.22
+                : 0.9
+              : mapMode === "risk"
+                ? 0.08
+                : 0.1;
         return {
           id: intg._id,
           source: intg.sourceSystemId,
@@ -2902,7 +2993,9 @@ function ArchitectureContent() {
               ? `${intg.protocol} · ${
                   METHOD_META[intg.method]?.label ?? intg.method
                 }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
-              : intg.criticalLevel === "high" || edgeFocus !== "all"
+              : intg.criticalLevel === "high" ||
+                  edgeFocus !== "all" ||
+                  (mapMode === "risk" && isRiskEdge)
                 ? (METHOD_META[intg.method]?.label ?? intg.method)
                 : undefined,
           data: { isHighCritical: intg.criticalLevel === "high" },
@@ -2930,6 +3023,7 @@ function ArchitectureContent() {
       integrations,
       selectedId,
       selectedZoneKey,
+      mapMode,
       filteredIds,
       edgeFocus,
       focusedZoneIds,
@@ -2963,6 +3057,26 @@ function ArchitectureContent() {
     const highDebtSystems = systems.filter(
       (s) => s.technicalDebtScore >= 70,
     ).length;
+    const highRiskSystems = systems.filter(
+      (s) =>
+        s.riskLevel === "high" ||
+        s.technicalDebtScore >= 70 ||
+        (integrationMetrics.get(s._id)?.worstHealth ?? "unknown") === "down",
+    ).length;
+    const criticalSystems = systems.filter(
+      (s) => s.criticality === "high",
+    ).length;
+    const affectedHubs = systems.filter((s) => {
+      if (!architectureLayout.centralIds.has(s._id)) return false;
+      const connected = integrations.filter(
+        (i) => i.sourceSystemId === s._id || i.destinationSystemId === s._id,
+      );
+      return connected.some(
+        (i) =>
+          ["degraded", "down"].includes(i.healthStatus) ||
+          !i.isArchitectureCompliant,
+      );
+    }).length;
     return {
       hubs: architectureLayout.centralIds.size,
       satellites: Math.max(
@@ -2974,10 +3088,19 @@ function ArchitectureContent() {
       issueIntegrations,
       nonCompliantIntegrations,
       highDebtSystems,
+      highRiskSystems,
+      criticalSystems,
+      affectedHubs,
       zones: architectureLayout.zones.filter((zone) => zone.id !== "zone-core")
         .length,
     };
-  }, [systems, integrations, architectureLayout, filteredSystems]);
+  }, [
+    systems,
+    integrations,
+    integrationMetrics,
+    architectureLayout,
+    filteredSystems,
+  ]);
 
   const handleSetViewTab = (tab: ViewTab) => {
     setViewTab(tab);
@@ -3052,6 +3175,27 @@ function ArchitectureContent() {
         {/* Architecture Map filters */}
         {viewTab === "map" && (
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-0.5">
+              {(
+                [
+                  ["ecosystem", "Hệ sinh thái"],
+                  ["risk", "Rủi ro"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  onClick={() => setMapMode(mode)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    mapMode === mode
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-border" />
             {(["healthy", "degraded", "down", "unknown"] as const).map((h) => {
               const hc = HEALTH_META[h];
               return (
@@ -3196,25 +3340,48 @@ function ArchitectureContent() {
               <RefreshCw className="h-2.5 w-2.5 text-indigo-400" />{" "}
               {t("method.realtime")}
             </span>
-            <span className="font-semibold text-foreground ml-2">
-              {t("arch.legend.moduleIcons")}
-            </span>
-            {(
-              Object.keys(LIFECYCLE_META) as (keyof typeof LIFECYCLE_META)[]
-            ).map((lk) => {
-              const lm = LIFECYCLE_META[lk];
-              const Icon = lm.Icon;
-              return (
-                <span
-                  key={lk}
-                  className="flex items-center gap-1"
-                  style={{ color: lm.color }}
-                >
-                  <Icon className="h-2.5 w-2.5" />
-                  {t(`lifecycle.${lk}`)}
+            {mapMode === "risk" ? (
+              <>
+                <span className="font-semibold text-foreground ml-2">
+                  Risk lens
                 </span>
-              );
-            })}
+                {[
+                  ["#ef4444", "High risk / down / debt ≥ 70"],
+                  ["#f59e0b", "Watch / degraded / debt 40-69"],
+                  ["#22c55e", "Stable"],
+                ].map(([color, label]) => (
+                  <span key={label} className="flex items-center gap-1">
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ background: color }}
+                    />
+                    {label}
+                  </span>
+                ))}
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-foreground ml-2">
+                  {t("arch.legend.moduleIcons")}
+                </span>
+                {(
+                  Object.keys(LIFECYCLE_META) as (keyof typeof LIFECYCLE_META)[]
+                ).map((lk) => {
+                  const lm = LIFECYCLE_META[lk];
+                  const Icon = lm.Icon;
+                  return (
+                    <span
+                      key={lk}
+                      className="flex items-center gap-1"
+                      style={{ color: lm.color }}
+                    >
+                      <Icon className="h-2.5 w-2.5" />
+                      {t(`lifecycle.${lk}`)}
+                    </span>
+                  );
+                })}
+              </>
+            )}
           </div>
 
           <div className="flex flex-1 overflow-hidden">
@@ -3275,7 +3442,9 @@ function ArchitectureContent() {
                     <div className="mb-2 flex items-center justify-between">
                       <div>
                         <div className="text-xs font-semibold text-slate-100">
-                          Đọc nhanh hệ sinh thái
+                          {mapMode === "risk"
+                            ? "Đọc nhanh rủi ro"
+                            : "Đọc nhanh hệ sinh thái"}
                         </div>
                         <div className="text-[10px] text-slate-400">
                           {architectureSummary.visibleSystems}/{systems.length}{" "}
@@ -3283,37 +3452,78 @@ function ArchitectureContent() {
                         </div>
                       </div>
                       <div className="rounded-full border border-indigo-400/40 bg-indigo-400/10 px-2 py-1 text-[10px] font-semibold text-indigo-200">
-                        Ecosystem
+                        {mapMode === "risk" ? "Risk lens" : "Ecosystem"}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-[10px]">
-                      <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
-                        <div className="text-slate-400">Hub trung tâm</div>
-                        <div className="text-lg font-bold text-indigo-200">
-                          {architectureSummary.hubs}
+                    {mapMode === "risk" ? (
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
+                          <div className="text-slate-400">Risk cao</div>
+                          <div className="text-lg font-bold text-red-200">
+                            {architectureSummary.highRiskSystems}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 p-2">
+                          <div className="text-slate-400">Nợ kỹ thuật cao</div>
+                          <div className="text-lg font-bold text-amber-200">
+                            {architectureSummary.highDebtSystems}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
+                          <div className="text-slate-400">Luồng lỗi</div>
+                          <div className="text-lg font-bold text-orange-200">
+                            {architectureSummary.issueIntegrations}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-rose-400/20 bg-rose-400/10 p-2">
+                          <div className="text-slate-400">Sai chuẩn</div>
+                          <div className="text-lg font-bold text-rose-200">
+                            {architectureSummary.nonCompliantIntegrations}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
+                          <div className="text-slate-400">Critical system</div>
+                          <div className="text-lg font-bold text-indigo-200">
+                            {architectureSummary.criticalSystems}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/10 p-2">
+                          <div className="text-slate-400">Hub ảnh hưởng</div>
+                          <div className="text-lg font-bold text-fuchsia-200">
+                            {architectureSummary.affectedHubs}
+                          </div>
                         </div>
                       </div>
-                      <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-2">
-                        <div className="text-slate-400">Vệ tinh</div>
-                        <div className="text-lg font-bold text-emerald-200">
-                          {architectureSummary.satellites}
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
+                          <div className="text-slate-400">Hub trung tâm</div>
+                          <div className="text-lg font-bold text-indigo-200">
+                            {architectureSummary.hubs}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-2">
+                          <div className="text-slate-400">Vệ tinh</div>
+                          <div className="text-lg font-bold text-emerald-200">
+                            {architectureSummary.satellites}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
+                          <div className="text-slate-400">Critical flow</div>
+                          <div className="text-lg font-bold text-orange-200">
+                            {architectureSummary.criticalIntegrations}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
+                          <div className="text-slate-400">Cần chú ý</div>
+                          <div className="text-lg font-bold text-red-200">
+                            {architectureSummary.issueIntegrations +
+                              architectureSummary.nonCompliantIntegrations +
+                              architectureSummary.highDebtSystems}
+                          </div>
                         </div>
                       </div>
-                      <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
-                        <div className="text-slate-400">Critical flow</div>
-                        <div className="text-lg font-bold text-orange-200">
-                          {architectureSummary.criticalIntegrations}
-                        </div>
-                      </div>
-                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
-                        <div className="text-slate-400">Cần chú ý</div>
-                        <div className="text-lg font-bold text-red-200">
-                          {architectureSummary.issueIntegrations +
-                            architectureSummary.nonCompliantIntegrations +
-                            architectureSummary.highDebtSystems}
-                        </div>
-                      </div>
-                    </div>
+                    )}
                     <div className="mt-3 border-t border-slate-700/70 pt-2">
                       <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                         Focus cụm
