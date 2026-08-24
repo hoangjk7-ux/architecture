@@ -703,18 +703,23 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            top: 30,
-            left: 28,
-            right: 28,
+            top: 20,
+            left: 46,
+            right: 46,
             zIndex: 1,
           }}
         >
           <div
             style={{
+              display: "inline-block",
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: "#050b18cc",
+              border: `1px solid ${data.accent}55`,
               color: "#e0f2fe",
-              fontSize: 17,
+              fontSize: 12,
               fontWeight: 900,
-              lineHeight: 1.15,
+              lineHeight: 1.2,
               letterSpacing: 0.5,
               textTransform: "uppercase",
               textShadow: `0 0 18px ${data.accent}`,
@@ -726,16 +731,16 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            bottom: 28,
-            left: 40,
-            right: 40,
+            bottom: 22,
+            left: 52,
+            right: 52,
             zIndex: 1,
           }}
         >
           <div
             style={{
               color: "#c4b5fd",
-              fontSize: 10,
+              fontSize: 9,
               lineHeight: 1.35,
             }}
           >
@@ -804,14 +809,14 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            inset: "auto 18px 18px 18px",
+            inset: "auto 14px 14px 14px",
             color: data.accent,
-            fontSize: 10,
+            fontSize: 9,
             fontWeight: 700,
             opacity: 0.8,
           }}
         >
-          Chưa có hệ thống trong cụm này
+          Slot chưa có dữ liệu
         </div>
       )}
     </div>
@@ -1292,9 +1297,9 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const rowGap = 18;
-  const stackGap = 14;
-  const colGap = 16;
+  const rowGap = 10;
+  const stackGap = 10;
+  const colGap = 10;
   const canvasLeft = 8;
   const topY = 28;
   const coreWidth = 360;
@@ -1316,7 +1321,7 @@ function layoutNodes(
     const config = ECOSYSTEM_GROUPS[key];
     const isPlaceholder = items.length === 0;
     const size = isPlaceholder
-      ? { columns: 1, rows: 1, width: 232, height: 170 }
+      ? { columns: 1, rows: 1, width: 206, height: 104 }
       : zoneSizeFor(items.length);
     zoneSpecs.set(key, {
       items,
@@ -3352,7 +3357,7 @@ function ArchitectureContent() {
   // <ReactFlowProvider> wrapper).
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const handleFitAll = () => {
-    reactFlowRef.current?.fitView({ padding: 0.06, duration: 300 });
+    reactFlowRef.current?.fitView({ padding: 0.035, duration: 300 });
   };
   const handleFocusZoneCamera = (nodeIds: string[]) => {
     if (!nodeIds.length) return;
@@ -4255,7 +4260,7 @@ function ArchitectureContent() {
                   nodeTypes={nodeTypes}
                   edgeTypes={edgeTypes}
                   fitView
-                  fitViewOptions={{ padding: 0.06 }}
+                  fitViewOptions={{ padding: 0.035 }}
                   minZoom={0.08}
                   maxZoom={1.8}
                   onInit={(instance) => {
