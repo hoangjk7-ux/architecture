@@ -169,6 +169,24 @@ const translations: TranslationMap = {
     en: "No vendors yet.",
   },
   "dashboard.risk": { vi: "Rủi ro", en: "Risk" },
+  "dashboard.projectProgress": {
+    vi: "Tiến độ tổng thể dự án",
+    en: "Overall Project Progress",
+  },
+  "dashboard.projectProgressSubtitle": {
+    vi: "Tổng hợp từ các mục trong lộ trình công nghệ",
+    en: "Aggregated from technology roadmap items",
+  },
+  "dashboard.overallCompletion": {
+    vi: "Hoàn thành tổng thể",
+    en: "Overall completion",
+  },
+  "dashboard.doneItems": { vi: "Đã xong", en: "Done" },
+  "dashboard.blockedItems": { vi: "Đang bị chặn", en: "Blocked" },
+  "dashboard.overdueItems": { vi: "Quá hạn", en: "Overdue" },
+  "dashboard.onTrack": { vi: "Đúng tiến độ", en: "On track" },
+  "dashboard.needsAttention": { vi: "Cần theo dõi", en: "Needs attention" },
+  "dashboard.atRisk": { vi: "Có rủi ro", en: "At risk" },
 
   "status.active": { vi: "Đang hoạt động", en: "Active" },
   "status.sunset": { vi: "Ngừng dùng", en: "Sunset" },
@@ -260,7 +278,10 @@ const translations: TranslationMap = {
   "systems.col.system": { vi: "Hệ thống", en: "System" },
   "systems.col.typeCategory": { vi: "Loại / Danh mục", en: "Type / Category" },
   "systems.col.owner": { vi: "Chủ sở hữu", en: "Owner" },
-  "systems.col.governingDepartment": { vi: "Phòng ban quản trị", en: "Governing Department" },
+  "systems.col.governingDepartment": {
+    vi: "Phòng ban quản trị",
+    en: "Governing Department",
+  },
   "systems.col.vendor": { vi: "Nhà cung cấp", en: "Vendor" },
   "systems.col.risk": { vi: "Rủi ro", en: "Risk" },
   "systems.col.scores": { vi: "Điểm số", en: "Scores" },
