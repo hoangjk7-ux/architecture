@@ -664,9 +664,42 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           justifyContent: "center",
           textAlign: "center",
           padding: 28,
+          position: "relative",
+          overflow: "hidden",
         }}
       >
-        <div>
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            width: 1,
+            height: "100%",
+            background: "rgba(103, 232, 249, 0.22)",
+            boxShadow: "0 0 18px rgba(34, 211, 238, 0.45)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: "50%",
+            width: "100%",
+            height: 1,
+            background: "rgba(103, 232, 249, 0.22)",
+            boxShadow: "0 0 18px rgba(34, 211, 238, 0.45)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 22,
+            borderRadius: 999,
+            border: "1px solid rgba(103, 232, 249, 0.22)",
+            boxShadow: "0 0 42px rgba(34, 211, 238, 0.25)",
+          }}
+        />
+        <div style={{ position: "relative", zIndex: 1 }}>
           <div
             style={{
               color: "#e0f2fe",
@@ -4193,11 +4226,6 @@ function ArchitectureContent() {
                     setSelectedIntegrationId(null);
                   }}
                 >
-                  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-                    <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-cyan-300/15 shadow-[0_0_24px_rgba(34,211,238,0.28)]" />
-                    <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-cyan-300/15 shadow-[0_0_24px_rgba(34,211,238,0.28)]" />
-                    <div className="absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/20 bg-cyan-400/5 shadow-[0_0_80px_rgba(34,211,238,0.22)]" />
-                  </div>
                   <div className="absolute left-4 top-4 z-10">
                     <Popover open={showHelp} onOpenChange={setShowHelp}>
                       <PopoverTrigger asChild>
