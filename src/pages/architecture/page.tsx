@@ -239,6 +239,7 @@ interface NodeData {
   riskTone: "high" | "medium" | "low" | "unknown";
   riskColor: string;
   riskLabel: string;
+  isMini: boolean;
 }
 
 interface ZoneNodeData {
@@ -247,6 +248,7 @@ interface ZoneNodeData {
   accent: string;
   isCore: boolean;
   isPlaceholder: boolean;
+  isMiniZone: boolean;
 }
 
 type ArchitectureNodeData = NodeData | ZoneNodeData;
@@ -361,6 +363,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
     riskTone,
     riskColor,
     riskLabel,
+    isMini,
   } = data;
   const meta = TYPE_META[s.type] ?? TYPE_META.core;
   const statusMeta = STATUS_META[s.status] ?? STATUS_META.inactive;
@@ -378,6 +381,122 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           ? "#0f2318"
           : "#111827"
     : meta.bg;
+
+  if (isMini) {
+    return (
+      <div
+        title={`${s.name} · ${s.category ?? ""}`}
+        style={{
+          background: isRiskMode ? "#0f172acc" : "#0b1222dd",
+          borderRadius: 12,
+          width: isCentral ? 132 : 112,
+          minHeight: 50,
+          cursor: "pointer",
+          border: `${isSelected ? "2px" : "1px"} solid ${
+            isSelected ? "#fff" : isRiskMode ? riskColor : `${meta.border}cc`
+          }`,
+          boxShadow: isSelected
+            ? `0 0 0 3px ${meta.border}55, 0 8px 24px #0008`
+            : isCentral
+              ? `0 0 24px ${meta.border}22, 0 2px 10px #0006`
+              : "0 2px 10px #0007",
+          padding: "7px 8px",
+          transition: "all 0.15s",
+        }}
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          style={{
+            background: healthColor,
+            width: 7,
+            height: 7,
+            border: "1.5px solid #0f172a",
+          }}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{
+            background: healthColor,
+            width: 7,
+            height: 7,
+            border: "1.5px solid #0f172a",
+          }}
+        />
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: `${isRiskMode ? riskColor : meta.border}22`,
+              color: isRiskMode ? riskColor : meta.border,
+              flexShrink: 0,
+            }}
+          >
+            <Icon size={13} />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                color: "#f8fafc",
+                fontSize: isCentral ? 10 : 9,
+                fontWeight: 800,
+                lineHeight: 1.1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {s.name}
+            </div>
+            <div
+              style={{
+                marginTop: 3,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 4,
+                color: "#94a3b8",
+                fontSize: 8,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: isRiskMode ? riskColor : healthColor,
+                    boxShadow: `0 0 10px ${isRiskMode ? riskColor : healthColor}`,
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {isRiskMode ? riskLabel : HEALTH_META[worstHealth]?.label}
+                </span>
+              </span>
+              <span style={{ flexShrink: 0 }}>
+                {inCount}/{outCount}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -748,6 +867,71 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
             {data.subtitle}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (data.isMiniZone) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          border: `1px solid ${data.accent}3d`,
+          borderRadius: 22,
+          background: `linear-gradient(135deg, ${data.accent}0b 0%, transparent 55%)`,
+          boxShadow: `inset 0 0 24px ${data.accent}08`,
+          pointerEvents: "none",
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 14,
+            right: 14,
+          }}
+        >
+          <div
+            style={{
+              color: data.isPlaceholder ? "#cbd5e1" : "#f8fafc",
+              fontSize: 11,
+              fontWeight: 900,
+              lineHeight: 1.1,
+              letterSpacing: 0.35,
+              textTransform: "uppercase",
+              textShadow: `0 0 12px ${data.accent}55`,
+            }}
+          >
+            {data.title}
+          </div>
+          <div
+            style={{
+              marginTop: 3,
+              color: data.isPlaceholder ? data.accent : "#94a3b8",
+              fontSize: 8,
+              fontWeight: data.isPlaceholder ? 800 : 500,
+              lineHeight: 1.2,
+            }}
+          >
+            {data.isPlaceholder ? "Slot chưa có dữ liệu" : data.subtitle}
+          </div>
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            right: 14,
+            bottom: 12,
+            width: 42,
+            height: 3,
+            borderRadius: 999,
+            background: data.accent,
+            boxShadow: `0 0 14px ${data.accent}`,
+            opacity: 0.7,
+          }}
+        />
       </div>
     );
   }
@@ -1130,22 +1314,23 @@ function placeGrid(
   y: number,
   columns: number,
   positions: Record<string, { x: number; y: number }>,
+  isCompressed = false,
 ) {
-  const nodeW = 146;
-  const nodeH = 86;
-  const gapX = 12;
-  const gapY = 12;
+  const nodeW = isCompressed ? 112 : 146;
+  const nodeH = isCompressed ? 50 : 86;
+  const gapX = isCompressed ? 10 : 12;
+  const gapY = isCompressed ? 8 : 12;
   items.forEach((system, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
     positions[system._id] = {
       x: x + 16 + col * (nodeW + gapX),
-      y: y + 56 + row * (nodeH + gapY),
+      y: y + (isCompressed ? 48 : 56) + row * (nodeH + gapY),
     };
   });
 }
 
-function zoneSizeFor(count: number) {
+function zoneSizeFor(count: number, isCompressed = false) {
   // A fixed 1-2 column grid makes zone height grow linearly with count —
   // a real dataset skewed toward one bucket (e.g. many systems falling
   // through to the "workspace" catch-all in classifyEcosystemGroup) can
@@ -1157,8 +1342,22 @@ function zoneSizeFor(count: number) {
   // square-shaped instead of an ever-taller single/double column. Cap at
   // three columns so the 4-corner ecosystem layout stays balanced instead of
   // becoming a very wide infographic.
-  const columns = count <= 3 ? 1 : Math.min(3, Math.ceil(Math.sqrt(count)));
+  const columns = isCompressed
+    ? count <= 2
+      ? 1
+      : Math.min(3, Math.ceil(Math.sqrt(count)))
+    : count <= 3
+      ? 1
+      : Math.min(3, Math.ceil(Math.sqrt(count)));
   const rows = Math.ceil(count / columns);
+  if (isCompressed) {
+    return {
+      columns,
+      rows,
+      width: Math.max(156, 16 + columns * 112 + (columns - 1) * 10 + 20),
+      height: Math.max(104, 48 + rows * 50 + (rows - 1) * 8 + 16),
+    };
+  }
   const width =
     columns === 1 ? 184 : 16 + columns * 146 + (columns - 1) * 12 + 24;
   return {
@@ -1311,6 +1510,7 @@ function buildRiskRecommendations(
 function layoutNodes(
   systems: System[],
   integrations: Integration[],
+  isCompressed = false,
 ): ArchitectureLayout {
   const metrics = buildIntegrationMetrics(integrations);
   const positions: Record<string, { x: number; y: number }> = {};
@@ -1354,14 +1554,16 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const quadrantGapX = 36;
-  const quadrantGapY = 24;
-  const stackGap = 8;
+  const quadrantGapX = isCompressed ? 32 : 36;
+  const quadrantGapY = isCompressed ? 18 : 24;
+  const stackGap = isCompressed ? 6 : 8;
   const canvasLeft = 0;
-  const coreWidth = 252;
-  const coreY = 292;
-  const centralGap = 92;
-  const centralHeight = Math.max(264, 82 + central.length * centralGap);
+  const coreWidth = isCompressed ? 230 : 252;
+  const coreY = isCompressed ? 214 : 292;
+  const centralGap = isCompressed ? 58 : 92;
+  const centralHeight = isCompressed
+    ? Math.max(220, 74 + central.length * centralGap)
+    : Math.max(264, 82 + central.length * centralGap);
   const zoneSpecs = new globalThis.Map<
     EcosystemGroupKey,
     {
@@ -1378,8 +1580,13 @@ function layoutNodes(
     const config = ECOSYSTEM_GROUPS[key];
     const isPlaceholder = items.length === 0;
     const size = isPlaceholder
-      ? { columns: 1, rows: 1, width: 142, height: 58 }
-      : zoneSizeFor(items.length);
+      ? {
+          columns: 1,
+          rows: 1,
+          width: isCompressed ? 136 : 142,
+          height: isCompressed ? 54 : 58,
+        }
+      : zoneSizeFor(items.length, isCompressed);
     zoneSpecs.set(key, {
       items,
       config,
@@ -1394,7 +1601,7 @@ function layoutNodes(
     zoneSpecs.get(key)?.height ?? 0;
   const zoneWidth = (key: EcosystemGroupKey) => zoneSpecs.get(key)?.width ?? 0;
   const maxZoneWidth = (keys: EcosystemGroupKey[]) =>
-    Math.max(...keys.map((key) => zoneWidth(key)), 168);
+    Math.max(...keys.map((key) => zoneWidth(key)), isCompressed ? 148 : 168);
   const leftKeys: EcosystemGroupKey[] = ["workspace", "platform", "pilot"];
   const rightKeys: EcosystemGroupKey[] = ["learning", "automation", "legacy"];
   const leftWidth = maxZoneWidth(leftKeys);
@@ -1421,7 +1628,7 @@ function layoutNodes(
       highDebtCount ? `${highDebtCount} nợ kỹ thuật cao` : null,
     ].filter(Boolean);
     if (!spec.isPlaceholder) {
-      placeGrid(spec.items, x, y, spec.columns, positions);
+      placeGrid(spec.items, x, y, spec.columns, positions, isCompressed);
     }
     zones.push({
       id: `zone-${key}`,
@@ -1475,12 +1682,16 @@ function layoutNodes(
     });
   };
 
-  const centralBlockHeight = 86 + (central.length - 1) * centralGap;
+  const centralBlockHeight =
+    (isCompressed ? 50 : 86) + (central.length - 1) * centralGap;
   const centralStartY =
-    coreY + Math.max(66, (centralHeight - centralBlockHeight) / 2 + 18);
+    coreY +
+    (isCompressed
+      ? Math.max(56, (centralHeight - centralBlockHeight) / 2 + 14)
+      : Math.max(66, (centralHeight - centralBlockHeight) / 2 + 18));
   central.forEach((system, index) => {
     positions[system._id] = {
-      x: coreX + (coreWidth - 172) / 2,
+      x: coreX + (coreWidth - (isCompressed ? 132 : 172)) / 2,
       y: centralStartY + index * centralGap,
     };
   });
@@ -3475,13 +3686,15 @@ function ArchitectureContent() {
     setSelectedZoneKey(null);
     setSelectedIntegrationId(id);
   };
+  const isOverviewCompressed =
+    !selectedId && !selectedIntegrationId && !selectedZoneKey;
   const selectedModules = useMemo(
     () => allModules.filter((m) => m.systemId === selectedId),
     [allModules, selectedId],
   );
   const architectureLayout = useMemo(
-    () => layoutNodes(systems, integrations),
-    [systems, integrations],
+    () => layoutNodes(systems, integrations, isOverviewCompressed),
+    [systems, integrations, isOverviewCompressed],
   );
   // Reuse the metrics `layoutNodes` already computed for centralityScore
   // instead of running the same O(integrations) aggregation a second time.
@@ -3586,6 +3799,7 @@ function ArchitectureContent() {
             accent: zone.accent,
             isCore: zone.id === "zone-core",
             isPlaceholder: Boolean(zone.isPlaceholder),
+            isMiniZone: isOverviewCompressed,
           },
           draggable: false,
           selectable: false,
@@ -3635,6 +3849,7 @@ function ArchitectureContent() {
           riskTone: riskTone.tone,
           riskColor: riskTone.color,
           riskLabel: riskTone.label,
+          isMini: isOverviewCompressed,
         },
         style: {
           opacity: isHiddenZone
@@ -3667,6 +3882,7 @@ function ArchitectureContent() {
     architectureLayout,
     selectedId,
     selectedZoneKey,
+    isOverviewCompressed,
     mapMode,
     hiddenZoneKeys,
     filteredIds,
