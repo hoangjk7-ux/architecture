@@ -254,6 +254,50 @@ function scoreTone(value: number, goodAtHigh = true) {
   return value > 60 ? "#ef4444" : value > 30 ? "#f59e0b" : "#22c55e";
 }
 
+function systemIconFor(system: System) {
+  const text = `${system.category} ${system.technology ?? ""} ${
+    system.hosting ?? ""
+  }`.toLowerCase();
+  if (text.includes("data") || text.includes("bi") || text.includes("sql")) {
+    return Database;
+  }
+  if (
+    text.includes("identity") ||
+    text.includes("security") ||
+    text.includes("auth")
+  ) {
+    return Shield;
+  }
+  if (
+    text.includes("web") ||
+    text.includes("portal") ||
+    text.includes("site") ||
+    text.includes("app")
+  ) {
+    return Globe;
+  }
+  if (
+    text.includes("infra") ||
+    text.includes("cloud") ||
+    text.includes("server") ||
+    text.includes("aws") ||
+    text.includes("gcp") ||
+    text.includes("azure")
+  ) {
+    return HardDrive;
+  }
+  if (
+    text.includes("hr") ||
+    text.includes("crm") ||
+    text.includes("student") ||
+    text.includes("user")
+  ) {
+    return Users;
+  }
+  if (system.type === "core") return Server;
+  return Layers;
+}
+
 function SystemNode({ data }: NodeProps<NodeData>) {
   const {
     system: s,
@@ -266,17 +310,20 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   const meta = TYPE_META[s.type] ?? TYPE_META.core;
   const statusMeta = STATUS_META[s.status] ?? STATUS_META.inactive;
   const healthColor = HEALTH_META[worstHealth]?.color ?? "#6b7280";
+  const Icon = systemIconFor(s);
   return (
     <div
       style={{
         background: meta.bg,
         borderRadius: 10,
-        width: 190,
+        width: isCentral ? 220 : 176,
         cursor: "pointer",
         border: `${isSelected ? "2.5px" : "1.5px"} solid ${isSelected ? "#fff" : meta.border}`,
         boxShadow: isSelected
           ? `0 0 0 3px ${meta.border}55, 0 4px 24px #0008`
-          : "0 2px 12px #0006",
+          : isCentral
+            ? `0 0 0 1px ${meta.border}66, 0 8px 30px ${meta.border}22`
+            : "0 2px 12px #0006",
         transition: "all 0.15s",
       }}
     >
@@ -344,27 +391,47 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         </span>
       </div>
       <div style={{ padding: "8px 10px" }}>
-        <div
-          style={{
-            color: meta.text,
-            fontWeight: 700,
-            fontSize: 12,
-            lineHeight: 1.3,
-            marginBottom: 2,
-          }}
-        >
-          {s.name}
-        </div>
-        <div
-          style={{
-            color: meta.text,
-            fontSize: 9,
-            opacity: 0.6,
-            marginBottom: 7,
-          }}
-        >
-          {s.category}
-          {s.criticality === "high" ? " · 🔴 Critical" : ""}
+        <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
+          <div
+            style={{
+              width: isCentral ? 28 : 24,
+              height: isCentral ? 28 : 24,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              background: `${meta.badge}44`,
+              border: `1px solid ${meta.badge}66`,
+              flexShrink: 0,
+            }}
+          >
+            <Icon size={isCentral ? 15 : 13} />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                color: meta.text,
+                fontWeight: 700,
+                fontSize: isCentral ? 13 : 11,
+                lineHeight: 1.25,
+                marginBottom: 2,
+              }}
+            >
+              {s.name}
+            </div>
+            <div
+              style={{
+                color: meta.text,
+                fontSize: 9,
+                opacity: 0.6,
+                marginBottom: 7,
+              }}
+            >
+              {s.category}
+              {s.criticality === "high" ? " · Critical" : ""}
+            </div>
+          </div>
         </div>
         {s.technology && (
           <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
@@ -663,6 +730,126 @@ type ArchitectureLayout = {
   metrics: globalThis.Map<string, IntegrationMetrics>;
 };
 
+type EcosystemGroupKey =
+  | "workspace"
+  | "learning"
+  | "automation"
+  | "platform"
+  | "pilot"
+  | "legacy";
+
+type EcosystemGroupConfig = {
+  title: string;
+  subtitle: string;
+  accent: string;
+  x: number;
+  y: number;
+};
+
+const ECOSYSTEM_GROUPS: Record<EcosystemGroupKey, EcosystemGroupConfig> = {
+  workspace: {
+    title: "Vận hành & Workspace",
+    subtitle: "ERP, CRM, HR, tài chính, cổng nội bộ và công cụ tác nghiệp",
+    accent: "#22c55e",
+    x: 35,
+    y: 46,
+  },
+  learning: {
+    title: "Học thuật & Trải nghiệm",
+    subtitle: "SIS, LMS, tuyển sinh, phụ huynh, học sinh và dịch vụ trường",
+    accent: "#38bdf8",
+    x: 910,
+    y: 46,
+  },
+  automation: {
+    title: "Tích hợp & Tự động hoá",
+    subtitle: "API, workflow, event, đồng bộ dữ liệu và tác vụ tự động",
+    accent: "#f97316",
+    x: 930,
+    y: 330,
+  },
+  platform: {
+    title: "Dữ liệu & Nền tảng",
+    subtitle: "BI, data, identity, cloud, database và hạ tầng dùng chung",
+    accent: "#8b5cf6",
+    x: 10,
+    y: 330,
+  },
+  pilot: {
+    title: "Pilot / thử nghiệm",
+    subtitle: "Sáng kiến đang kiểm chứng trước khi đưa vào lõi vận hành",
+    accent: "#3b82f6",
+    x: 155,
+    y: 625,
+  },
+  legacy: {
+    title: "Legacy / chuyển đổi",
+    subtitle: "Hệ thống nợ kỹ thuật, sunset hoặc cần tách khỏi lõi",
+    accent: "#f59e0b",
+    x: 770,
+    y: 625,
+  },
+};
+
+function classifyEcosystemGroup(system: System): EcosystemGroupKey {
+  const text = `${system.category} ${system.name} ${system.description ?? ""}`
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ");
+
+  if (
+    system.type === "legacy" ||
+    system.status === "sunset" ||
+    system.status === "inactive" ||
+    system.technicalDebtScore >= 75
+  ) {
+    return "legacy";
+  }
+  if (system.type === "pilot" || system.status === "pilot") return "pilot";
+  if (
+    /\b(api|integration|integrations|workflow|automation|sync|etl|event|queue|middleware|ipaas)\b/.test(
+      text,
+    )
+  ) {
+    return "automation";
+  }
+  if (
+    /\b(bi|data|analytics|warehouse|lake|database|db|identity|iam|sso|security|infra|infrastructure|cloud|network)\b/.test(
+      text,
+    )
+  ) {
+    return "platform";
+  }
+  if (
+    /\b(sis|lms|learning|academic|student|parent|admission|admissions|library|school|campus|curriculum|assessment)\b/.test(
+      text,
+    )
+  ) {
+    return "learning";
+  }
+  return "workspace";
+}
+
+function placeGrid(
+  items: System[],
+  x: number,
+  y: number,
+  columns: number,
+  positions: Record<string, { x: number; y: number }>,
+) {
+  const nodeW = 176;
+  const nodeH = 148;
+  const gapX = 22;
+  const gapY = 22;
+  items.forEach((system, index) => {
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    positions[system._id] = {
+      x: x + 26 + col * (nodeW + gapX),
+      y: y + 68 + row * (nodeH + gapY),
+    };
+  });
+}
+
 function buildIntegrationMetrics(integrations: Integration[]) {
   const metrics = new globalThis.Map<string, IntegrationMetrics>();
   const getMetrics = (systemId: string) => {
@@ -736,205 +923,74 @@ function layoutNodes(
     if (scoreDelta !== 0) return scoreDelta;
     return a.name.localeCompare(b.name);
   });
-  const coreSystems = sorted.filter((system) => system.type === "core");
   const centralCount = Math.min(
-    Math.max(coreSystems.length, systems.length > 8 ? 3 : 2),
-    Math.max(1, Math.min(5, systems.length)),
+    systems.length > 14 ? 3 : systems.length > 7 ? 2 : 1,
+    systems.length,
   );
   const centralIds = new Set(sorted.slice(0, centralCount).map((s) => s._id));
 
-  const centerX = 560;
-  const centerY = 260;
-  const rowGap = 190;
-  const colGap = 250;
-  const laneTop = 40;
-  const laneBottom = centerY + Math.max(2, centralCount) * rowGap;
-
-  const placeColumn = (
-    items: System[],
-    x: number,
-    startY: number,
-    gap = rowGap,
-  ) => {
-    items.forEach((system, index) => {
-      positions[system._id] = { x, y: startY + index * gap };
-    });
-  };
-
   const central = sorted.filter((system) => centralIds.has(system._id));
-  placeColumn(central, centerX, centerY - ((central.length - 1) * rowGap) / 2);
-
   const satellites = sorted.filter((system) => !centralIds.has(system._id));
-  const connectedSatellites = satellites.filter((system) =>
-    integrations.some(
-      (integration) =>
-        (centralIds.has(integration.sourceSystemId) &&
-          integration.destinationSystemId === system._id) ||
-        (centralIds.has(integration.destinationSystemId) &&
-          integration.sourceSystemId === system._id),
-    ),
-  );
-  const connectedIds = new Set(connectedSatellites.map((system) => system._id));
-  const pilots = satellites.filter(
-    (system) => system.type === "pilot" && !connectedIds.has(system._id),
-  );
-  const legacy = satellites.filter(
-    (system) => system.type === "legacy" && !connectedIds.has(system._id),
-  );
-  const outer = satellites.filter(
-    (system) =>
-      !connectedIds.has(system._id) &&
-      system.type !== "pilot" &&
-      system.type !== "legacy",
-  );
 
-  // "Vệ tinh nguồn" (left) = feeds data INTO the hub; "Vệ tinh tiêu thụ"
-  // (right) = receives data FROM the hub. Assign by actual integration
-  // direction against the hub, not by array index — a satellite that only
-  // ever sends to the hub must not land in the "consumer" column just
-  // because of its position in the sorted list. Bidirectional/ambiguous
-  // satellites fall back to whichever column is currently smaller, to keep
-  // the layout reasonably balanced.
-  const left: System[] = [];
-  const right: System[] = [];
-  connectedSatellites.forEach((system) => {
-    const feedsIntoHub = integrations.some(
-      (integration) =>
-        integration.sourceSystemId === system._id &&
-        centralIds.has(integration.destinationSystemId),
-    );
-    const receivesFromHub = integrations.some(
-      (integration) =>
-        integration.destinationSystemId === system._id &&
-        centralIds.has(integration.sourceSystemId),
-    );
-    if (feedsIntoHub && !receivesFromHub) {
-      left.push(system);
-    } else if (receivesFromHub && !feedsIntoHub) {
-      right.push(system);
-    } else {
-      (left.length <= right.length ? left : right).push(system);
-    }
-  });
-  placeColumn(
-    left,
-    centerX - colGap,
-    centerY - ((left.length - 1) * rowGap) / 2,
-  );
-  placeColumn(
-    right,
-    centerX + colGap,
-    centerY - ((right.length - 1) * rowGap) / 2,
-  );
-
-  pilots.forEach((system, index) => {
+  const centerX = 590;
+  const centerY = 350;
+  const centralGap = 164;
+  central.forEach((system, index) => {
     positions[system._id] = {
-      x: centerX - ((pilots.length - 1) * colGap) / 2 + index * colGap,
-      y: laneTop,
+      x: centerX,
+      y: centerY - ((central.length - 1) * centralGap) / 2 + index * centralGap,
     };
   });
-  legacy.forEach((system, index) => {
-    positions[system._id] = {
-      x: centerX - ((legacy.length - 1) * colGap) / 2 + index * colGap,
-      y: laneBottom,
-    };
+
+  const groups = new globalThis.Map<EcosystemGroupKey, System[]>();
+  (Object.keys(ECOSYSTEM_GROUPS) as EcosystemGroupKey[]).forEach((key) => {
+    groups.set(key, []);
   });
-  placeColumn(
-    outer,
-    centerX + colGap * 2,
-    centerY - ((outer.length - 1) * rowGap) / 2,
-  );
+  satellites.forEach((system) => {
+    groups.get(classifyEcosystemGroup(system))!.push(system);
+  });
 
-  const maxColumnItems = Math.max(left.length, right.length, outer.length, 2);
-  const mainZoneHeight = maxColumnItems * rowGap + 90;
-  const mainZoneY = centerY - mainZoneHeight / 2 + 45;
-  const pilotWidth = Math.max(420, pilots.length * colGap + 120);
-  const legacyWidth = Math.max(560, legacy.length * colGap + 120);
+  const zones: ArchitectureZone[] = [];
+  groups.forEach((items, key) => {
+    if (!items.length) return;
+    const config = ECOSYSTEM_GROUPS[key];
+    const columns = items.length > 3 ? 2 : 1;
+    const rows = Math.ceil(items.length / columns);
+    const width = columns === 2 ? 438 : 242;
+    const height = Math.max(228, 82 + rows * 148 + (rows - 1) * 22 + 28);
+    placeGrid(items, config.x, config.y, columns, positions);
+    zones.push({
+      id: `zone-${key}`,
+      title: config.title,
+      subtitle: `${items.length} hệ thống · ${config.subtitle}`,
+      x: config.x,
+      y: config.y,
+      width,
+      height,
+      accent: config.accent,
+    });
+  });
 
-  // A zone with no system in it still has a full-size box that
-  // participates in React Flow's `fitView` bounds and the MiniMap — it
-  // reads as an empty gap in the viewport instead of just not being drawn.
-  // Only keep zones that actually have at least one system placed in them.
-  const nonEmptyZoneIds = new Set<string>();
-  if (pilots.length) nonEmptyZoneIds.add("zone-pilot");
-  if (left.length) nonEmptyZoneIds.add("zone-satellite-left");
-  if (central.length) nonEmptyZoneIds.add("zone-core");
-  if (right.length) nonEmptyZoneIds.add("zone-satellite-right");
-  if (outer.length) nonEmptyZoneIds.add("zone-outer");
-  if (legacy.length) nonEmptyZoneIds.add("zone-legacy");
+  const centralHeight = Math.max(252, 86 + central.length * centralGap);
+  zones.push({
+    id: "zone-core",
+    title: "Trung tâm kiến trúc",
+    subtitle:
+      central.length === 1
+        ? "Hub chính được chọn theo số kết nối, loại core và mức trọng yếu"
+        : `${central.length} hub chính được chọn theo số kết nối, loại core và mức trọng yếu`,
+    x: centerX - 34,
+    y: centerY - centralHeight / 2 + 45,
+    width: 288,
+    height: centralHeight,
+    accent: "#a78bfa",
+  });
 
   return {
     positions,
     centralIds,
     metrics,
-    zones: [
-      {
-        id: "zone-pilot",
-        title: "Pilot / thử nghiệm",
-        subtitle: "Các hệ thống đang kiểm chứng trước khi đưa vào lõi vận hành",
-        x: centerX - pilotWidth / 2 - 30,
-        y: laneTop - 35,
-        width: pilotWidth,
-        height: 165,
-        accent: "#38bdf8",
-      },
-      {
-        id: "zone-satellite-left",
-        title: "Vệ tinh nguồn",
-        subtitle:
-          "Nguồn dữ liệu, kênh phát sinh hoặc hệ thống đẩy luồng vào hub",
-        x: centerX - colGap - 55,
-        y: mainZoneY,
-        width: 230,
-        height: mainZoneHeight,
-        accent: "#22c55e",
-      },
-      {
-        id: "zone-core",
-        title: "Trung tâm kiến trúc",
-        subtitle: "Hub ưu tiên theo số kết nối, loại core và mức trọng yếu",
-        x: centerX - 55,
-        y: centerY - (central.length * rowGap) / 2 - 35,
-        width: 230,
-        height: Math.max(260, central.length * rowGap + 70),
-        accent: "#a78bfa",
-      },
-      {
-        id: "zone-satellite-right",
-        title: "Vệ tinh tiêu thụ",
-        subtitle: "Hệ thống nhận dữ liệu, phụ thuộc hoặc phục vụ luồng từ hub",
-        x: centerX + colGap - 55,
-        y: mainZoneY,
-        width: 230,
-        height: mainZoneHeight,
-        accent: "#f97316",
-      },
-      {
-        id: "zone-outer",
-        title: "Vệ tinh ngoài biên",
-        subtitle: "Hệ thống ít liên kết trực tiếp với hub, cần rà soát vai trò",
-        x: centerX + colGap * 2 - 55,
-        y: mainZoneY,
-        width: 230,
-        height: mainZoneHeight,
-        accent: "#64748b",
-      },
-      {
-        id: "zone-legacy",
-        title: "Legacy / chuyển đổi",
-        subtitle:
-          "Nợ kỹ thuật, kế hoạch thay thế hoặc hệ thống cần tách khỏi lõi",
-        x: centerX - legacyWidth / 2 - 30,
-        y: laneBottom - 35,
-        width: legacyWidth,
-        // Legacy systems are always placed on a single row (see the
-        // `legacy.forEach` placement above, same as the pilot lane) — the
-        // box height must match that single row, not a wrapped multi-row
-        // estimate the placement never actually produces.
-        height: 165,
-        accent: "#f59e0b",
-      },
-    ].filter((zone) => nonEmptyZoneIds.has(zone.id)),
+    zones,
   };
 }
 
@@ -2730,7 +2786,14 @@ function ArchitectureContent() {
           source: intg.sourceSystemId,
           target: intg.destinationSystemId,
           type: "glow",
-          label: `${intg.protocol} · ${METHOD_META[intg.method]?.label ?? intg.method}${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`,
+          label:
+            selectedId && isFocused
+              ? `${intg.protocol} · ${
+                  METHOD_META[intg.method]?.label ?? intg.method
+                }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
+              : intg.criticalLevel === "high"
+                ? METHOD_META[intg.method]?.label ?? intg.method
+                : undefined,
           data: { isHighCritical: intg.criticalLevel === "high" },
           style: {
             stroke: hc.color,
@@ -3006,20 +3069,20 @@ function ArchitectureContent() {
                 >
                   <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700/80 bg-slate-950/85 px-3 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
                     <div className="mb-1 font-semibold text-slate-100">
-                      Bố cục trung tâm - vệ tinh
+                      Bản đồ hệ sinh thái kiến trúc
                     </div>
                     <div className="space-y-0.5">
                       <div>
-                        <span className="text-indigo-300">Giữa:</span> core,
-                        critical, nhiều kết nối
+                        <span className="text-indigo-300">Trung tâm:</span>{" "}
+                        hub có nhiều kết nối và mức trọng yếu cao
                       </div>
                       <div>
-                        <span className="text-emerald-300">Hai bên:</span> vệ
-                        tinh đang tích hợp trực tiếp
+                        <span className="text-emerald-300">Xung quanh:</span>{" "}
+                        cụm vệ tinh theo vai trò nghiệp vụ/nền tảng
                       </div>
                       <div>
-                        <span className="text-amber-300">Trên/dưới:</span> pilot
-                        và legacy
+                        <span className="text-amber-300">Luồng:</span> click hệ
+                        thống để soi kết nối và chi tiết tích hợp
                       </div>
                     </div>
                   </div>
