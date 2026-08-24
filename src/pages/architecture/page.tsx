@@ -658,8 +658,8 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           height: "100%",
           border: `2px solid ${data.accent}`,
           borderRadius: 999,
-          background: `radial-gradient(circle at 50% 48%, ${data.accent}32 0%, ${data.accent}1a 36%, #06101fdd 68%)`,
-          boxShadow: `0 0 0 6px ${data.accent}14, 0 0 38px ${data.accent}55, inset 0 0 34px ${data.accent}32`,
+          background: `radial-gradient(circle at 50% 50%, ${data.accent}30 0%, ${data.accent}18 35%, #06101fdd 68%)`,
+          boxShadow: `0 0 0 5px ${data.accent}12, 0 0 34px ${data.accent}4d, inset 0 0 30px ${data.accent}2e`,
           pointerEvents: "none",
           display: "flex",
           alignItems: "center",
@@ -695,7 +695,7 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            inset: 20,
+            inset: 18,
             borderRadius: 999,
             border: "1px solid rgba(103, 232, 249, 0.22)",
             boxShadow: "0 0 42px rgba(34, 211, 238, 0.25)",
@@ -704,9 +704,9 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            top: 16,
-            left: 52,
-            right: 52,
+            top: 14,
+            left: 44,
+            right: 44,
             zIndex: 1,
           }}
         >
@@ -1354,14 +1354,14 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const quadrantGapX = 48;
-  const quadrantGapY = 28;
+  const quadrantGapX = 36;
+  const quadrantGapY = 24;
   const stackGap = 8;
-  const canvasLeft = 10;
-  const canvasTop = 18;
-  const coreWidth = 270;
-  const centralGap = 96;
-  const centralHeight = Math.max(286, 96 + central.length * centralGap);
+  const canvasLeft = 0;
+  const coreWidth = 252;
+  const coreY = 292;
+  const centralGap = 92;
+  const centralHeight = Math.max(264, 82 + central.length * centralGap);
   const zoneSpecs = new globalThis.Map<
     EcosystemGroupKey,
     {
@@ -1399,14 +1399,9 @@ function layoutNodes(
   const rightKeys: EcosystemGroupKey[] = ["learning", "automation", "legacy"];
   const leftWidth = maxZoneWidth(leftKeys);
   const rightWidth = maxZoneWidth(rightKeys);
-  const topRowHeight = Math.max(
-    zoneHeight("workspace"),
-    zoneHeight("learning"),
-  );
   const leftX = canvasLeft;
   const coreX = leftX + leftWidth + quadrantGapX;
   const rightX = coreX + coreWidth + quadrantGapX;
-  const coreY = canvasTop + topRowHeight + quadrantGapY;
   const bottomRowY = coreY + centralHeight + quadrantGapY;
 
   const placeZone = (key: EcosystemGroupKey, x: number, y: number) => {
@@ -1455,13 +1450,13 @@ function layoutNodes(
   placeInQuadrant(
     "workspace",
     leftX,
-    canvasTop + topRowHeight - zoneHeight("workspace"),
+    coreY - zoneHeight("workspace") - quadrantGapY,
     leftWidth,
   );
   placeInQuadrant(
     "learning",
     rightX,
-    canvasTop + topRowHeight - zoneHeight("learning"),
+    coreY - zoneHeight("learning") - quadrantGapY,
     rightWidth,
   );
 
@@ -1482,7 +1477,7 @@ function layoutNodes(
 
   const centralBlockHeight = 86 + (central.length - 1) * centralGap;
   const centralStartY =
-    coreY + Math.max(72, (centralHeight - centralBlockHeight) / 2 + 22);
+    coreY + Math.max(66, (centralHeight - centralBlockHeight) / 2 + 18);
   central.forEach((system, index) => {
     positions[system._id] = {
       x: coreX + (coreWidth - 172) / 2,
@@ -3755,7 +3750,7 @@ function ArchitectureContent() {
                 ? mapMode === "risk" && !isRiskEdge
                   ? 0.22
                   : isDefaultOverview && !isRiskEdge
-                    ? 0.18
+                    ? 0.14
                     : 0.9
                 : mapMode === "risk"
                   ? 0.08
@@ -4407,7 +4402,7 @@ function ArchitectureContent() {
                     </Popover>
                   </div>
                   <div
-                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "max-h-[calc(100%-240px)] w-[270px] overflow-y-auto" : "w-[230px]"}`}
+                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "max-h-[calc(100%-240px)] w-[270px] overflow-y-auto" : "w-[210px]"}`}
                   >
                     <button
                       onClick={() => setShowQuickRead((v) => !v)}
