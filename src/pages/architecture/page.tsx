@@ -4240,73 +4240,6 @@ function ArchitectureContent() {
       {/* ── Architecture Map View ── */}
       {viewTab === "map" && (
         <>
-          <div className="shrink-0 px-5 py-1.5 border-b border-border flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground bg-muted/20">
-            <span className="font-semibold text-foreground">
-              {t("arch.legend.edge")}
-            </span>
-            {(Object.keys(HEALTH_META) as (keyof typeof HEALTH_META)[]).map(
-              (hk) => (
-                <span key={hk} className="flex items-center gap-1">
-                  <span
-                    className="inline-block w-5 h-0.5 rounded"
-                    style={{ background: HEALTH_META[hk].color }}
-                  />
-                  {t(`health.${hk}`)}
-                </span>
-              ),
-            )}
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-5 border-t-2 border-dashed border-orange-400" />{" "}
-              {t("detail.nonCompliant")}
-            </span>
-            <span className="flex items-center gap-1">
-              <RefreshCw className="h-2.5 w-2.5 text-indigo-400" />{" "}
-              {t("method.realtime")}
-            </span>
-            {mapMode === "risk" ? (
-              <>
-                <span className="font-semibold text-foreground ml-2">
-                  Risk lens
-                </span>
-                {[
-                  ["#ef4444", "High risk / down / debt ≥ 70"],
-                  ["#f59e0b", "Watch / degraded / debt 40-69"],
-                  ["#22c55e", "Stable"],
-                ].map(([color, label]) => (
-                  <span key={label} className="flex items-center gap-1">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ background: color }}
-                    />
-                    {label}
-                  </span>
-                ))}
-              </>
-            ) : (
-              <>
-                <span className="font-semibold text-foreground ml-2">
-                  {t("arch.legend.moduleIcons")}
-                </span>
-                {(
-                  Object.keys(LIFECYCLE_META) as (keyof typeof LIFECYCLE_META)[]
-                ).map((lk) => {
-                  const lm = LIFECYCLE_META[lk];
-                  const Icon = lm.Icon;
-                  return (
-                    <span
-                      key={lk}
-                      className="flex items-center gap-1"
-                      style={{ color: lm.color }}
-                    >
-                      <Icon className="h-2.5 w-2.5" />
-                      {t(`lifecycle.${lk}`)}
-                    </span>
-                  );
-                })}
-              </>
-            )}
-          </div>
-
           <div className="flex flex-1 overflow-hidden">
             <div
               className="flex-1 overflow-hidden"
@@ -4412,6 +4345,64 @@ function ArchitectureContent() {
                             </div>
                           </div>
                         )}
+                        <div className="mt-2 border-t border-slate-700/70 pt-2">
+                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                            {t("arch.legend.edge")}
+                          </div>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1">
+                            {(
+                              Object.keys(
+                                HEALTH_META,
+                              ) as (keyof typeof HEALTH_META)[]
+                            ).map((hk) => (
+                              <span
+                                key={hk}
+                                className="flex items-center gap-1"
+                              >
+                                <span
+                                  className="inline-block w-5 h-0.5 rounded"
+                                  style={{ background: HEALTH_META[hk].color }}
+                                />
+                                {t(`health.${hk}`)}
+                              </span>
+                            ))}
+                            <span className="flex items-center gap-1">
+                              <span className="inline-block w-5 border-t-2 border-dashed border-orange-400" />
+                              {t("detail.nonCompliant")}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="h-2.5 w-2.5 text-indigo-400" />
+                              {t("method.realtime")}
+                            </span>
+                          </div>
+                          {mapMode !== "risk" && (
+                            <>
+                              <div className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                {t("arch.legend.moduleIcons")}
+                              </div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                {(
+                                  Object.keys(
+                                    LIFECYCLE_META,
+                                  ) as (keyof typeof LIFECYCLE_META)[]
+                                ).map((lk) => {
+                                  const lm = LIFECYCLE_META[lk];
+                                  const Icon = lm.Icon;
+                                  return (
+                                    <span
+                                      key={lk}
+                                      className="flex items-center gap-1"
+                                      style={{ color: lm.color }}
+                                    >
+                                      <Icon className="h-2.5 w-2.5" />
+                                      {t(`lifecycle.${lk}`)}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </PopoverContent>
                     </Popover>
                   </div>
