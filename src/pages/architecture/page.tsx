@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -29,16 +30,23 @@ import ReactFlow, {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  useStore,
   type Node,
   type Edge,
   type EdgeProps,
   type NodeProps,
   type MiniMapNodeProps,
+  type ReactFlowInstance,
   MarkerType,
   Handle,
   Position,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover.tsx";
 import type { Doc, Id } from "@/convex/_generated/dataModel.d.ts";
 import {
   Server,
@@ -69,6 +77,11 @@ import {
   AlertTriangle,
   XCircle,
   HelpCircle,
+  Info,
+  SlidersHorizontal,
+  Maximize2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import SystemFlowSVG from "../flow-diagram/_components/SystemFlowSVG.tsx";
 import GanttChart from "../flow-diagram/_components/GanttChart.tsx";
@@ -324,7 +337,18 @@ function systemIconFor(system: System) {
   return Layers;
 }
 
+// Reads only the current zoom scale (transform[2]) so a node re-renders
+// when the user zooms, not on every pan. Semantic zoom: at a distance the
+// canvas needs to read as a map, not a grid of full detail cards — dense
+// datasets otherwise get crushed to unreadable 8-9px text at initial
+// fitView (see .ai/architecture-overview-ux-review.md, P1.1).
+const zoomSelector = (state: { transform: [number, number, number] }) =>
+  state.transform[2];
+const COMPACT_ZOOM_THRESHOLD = 0.35;
+
 function SystemNode({ data }: NodeProps<NodeData>) {
+  const zoom = useStore(zoomSelector);
+  const isCompact = zoom < COMPACT_ZOOM_THRESHOLD;
   const {
     system: s,
     inCount,
@@ -497,7 +521,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             </div>
           </div>
         </div>
-        {s.technology && (
+        {!isCompact && s.technology && (
           <div style={{ display: "flex", gap: 4, marginBottom: 5 }}>
             <span
               style={{
@@ -533,58 +557,60 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             )}
           </div>
         )}
-        <div style={{ marginBottom: 6 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 8,
-              color: "#64748b",
-              marginBottom: 2,
-            }}
-          >
-            <span>Arch Score</span>
-            <span style={{ color: "#22c55e", fontWeight: 600 }}>
-              {s.architectureScore}
-            </span>
-          </div>
-          <ScoreBar value={s.architectureScore} color="#22c55e" />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 8,
-              color: "#64748b",
-              marginTop: 4,
-              marginBottom: 2,
-            }}
-          >
-            <span>Tech Debt</span>
-            <span
+        {!isCompact && (
+          <div style={{ marginBottom: 6 }}>
+            <div
               style={{
-                color:
-                  s.technicalDebtScore > 60
-                    ? "#ef4444"
-                    : s.technicalDebtScore > 30
-                      ? "#f59e0b"
-                      : "#22c55e",
-                fontWeight: 600,
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 8,
+                color: "#64748b",
+                marginBottom: 2,
               }}
             >
-              {s.technicalDebtScore}
-            </span>
+              <span>Arch Score</span>
+              <span style={{ color: "#22c55e", fontWeight: 600 }}>
+                {s.architectureScore}
+              </span>
+            </div>
+            <ScoreBar value={s.architectureScore} color="#22c55e" />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 8,
+                color: "#64748b",
+                marginTop: 4,
+                marginBottom: 2,
+              }}
+            >
+              <span>Tech Debt</span>
+              <span
+                style={{
+                  color:
+                    s.technicalDebtScore > 60
+                      ? "#ef4444"
+                      : s.technicalDebtScore > 30
+                        ? "#f59e0b"
+                        : "#22c55e",
+                  fontWeight: 600,
+                }}
+              >
+                {s.technicalDebtScore}
+              </span>
+            </div>
+            <ScoreBar
+              value={s.technicalDebtScore}
+              color={
+                s.technicalDebtScore > 60
+                  ? "#ef4444"
+                  : s.technicalDebtScore > 30
+                    ? "#f59e0b"
+                    : "#22c55e"
+              }
+            />
           </div>
-          <ScoreBar
-            value={s.technicalDebtScore}
-            color={
-              s.technicalDebtScore > 60
-                ? "#ef4444"
-                : s.technicalDebtScore > 30
-                  ? "#f59e0b"
-                  : "#22c55e"
-            }
-          />
-        </div>
+        )}
         <div
           style={{
             display: "flex",
@@ -734,6 +760,11 @@ function GlowEdge({
   const strokeColor = (style?.stroke as string) ?? "#6b7280";
   const strokeWidth = Number(style?.strokeWidth ?? 1.5);
   const edgeOpacity = Number(style?.opacity ?? 1);
+  const zoom = useStore(zoomSelector);
+  // Below this zoom, edge labels are unreadable anyway and just add noise
+  // to an already-dense set of crossing lines — hide instead of rendering
+  // illegible 8px text (.ai/architecture-overview-ux-review.md, P1.2).
+  const showLabel = label && zoom >= COMPACT_ZOOM_THRESHOLD;
 
   return (
     <>
@@ -747,7 +778,7 @@ function GlowEdge({
         />
       )}
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
-      {label && (
+      {showLabel && (
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan"
@@ -1691,12 +1722,14 @@ function DetailPanel({
   systems,
   modules,
   onClose,
+  onSelectIntegration,
 }: {
   system: System;
   integrations: Integration[];
   systems: System[];
   modules: SystemModule[];
   onClose: () => void;
+  onSelectIntegration: (id: Id<"integrations">) => void;
 }) {
   const { canWrite } = useCurrentUser();
   const { t } = useLanguage();
@@ -1911,9 +1944,11 @@ function DetailPanel({
                       HEALTH_META[intg.healthStatus] ?? HEALTH_META.unknown;
                     const mc = METHOD_META[intg.method] ?? METHOD_META.manual;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={intg._id}
-                        className="bg-muted/30 rounded-lg p-2.5 space-y-1.5 border"
+                        onClick={() => onSelectIntegration(intg._id)}
+                        className="w-full bg-muted/30 rounded-lg p-2.5 space-y-1.5 border text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         style={{ borderColor: hc.color + "33" }}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -1964,7 +1999,7 @@ function DetailPanel({
                             {intg.lastSync.slice(0, 16).replace("T", " ")}
                           </div>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1985,9 +2020,11 @@ function DetailPanel({
                       HEALTH_META[intg.healthStatus] ?? HEALTH_META.unknown;
                     const mc = METHOD_META[intg.method] ?? METHOD_META.manual;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={intg._id}
-                        className="bg-muted/30 rounded-lg p-2.5 space-y-1.5 border"
+                        onClick={() => onSelectIntegration(intg._id)}
+                        className="w-full bg-muted/30 rounded-lg p-2.5 space-y-1.5 border text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         style={{ borderColor: hc.color + "33" }}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -2038,7 +2075,7 @@ function DetailPanel({
                             {intg.lastSync.slice(0, 16).replace("T", " ")}
                           </div>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -2356,6 +2393,156 @@ function DetailPanel({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function IntegrationInspector({
+  integration,
+  systems,
+  onClose,
+  onSelectSystem,
+}: {
+  integration: Integration;
+  systems: System[];
+  onClose: () => void;
+  onSelectSystem: (id: Id<"software_systems">) => void;
+}) {
+  const { t } = useLanguage();
+  const source = systems.find(
+    (system) => system._id === integration.sourceSystemId,
+  );
+  const destination = systems.find(
+    (system) => system._id === integration.destinationSystemId,
+  );
+  const health = HEALTH_META[integration.healthStatus] ?? HEALTH_META.unknown;
+  const method = METHOD_META[integration.method] ?? METHOD_META.manual;
+
+  return (
+    <aside className="flex h-full w-[340px] shrink-0 flex-col overflow-hidden border-l border-border bg-background">
+      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("detail.integration")}
+          </div>
+          <h2 className="truncate text-sm font-bold">{integration.name}</h2>
+        </div>
+        <button
+          type="button"
+          aria-label={t("common.close")}
+          onClick={onClose}
+          className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="flex flex-wrap gap-2">
+          <span
+            className="rounded-full px-2 py-1 text-[10px] font-semibold"
+            style={{ background: `${health.color}22`, color: health.color }}
+          >
+            {t(`health.${integration.healthStatus}`)}
+          </span>
+          <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold">
+            {integration.protocol} · {t(`method.${integration.method}`)}
+          </span>
+          <span
+            className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+              integration.isArchitectureCompliant
+                ? "bg-green-500/10 text-green-400"
+                : "bg-orange-500/10 text-orange-400"
+            }`}
+          >
+            {integration.isArchitectureCompliant
+              ? t("integrations.compliant")
+              : t("detail.nonCompliant")}
+          </span>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onSelectSystem(integration.sourceSystemId)}
+              className="min-w-0 text-left"
+            >
+              <div className="text-[10px] text-muted-foreground">
+                {t("integrations.form.source")}
+              </div>
+              <div className="truncate text-xs font-semibold text-blue-400">
+                {source?.name ?? t("detail.unknown")}
+              </div>
+            </button>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => onSelectSystem(integration.destinationSystemId)}
+              className="min-w-0 text-right"
+            >
+              <div className="text-[10px] text-muted-foreground">
+                {t("integrations.form.destination")}
+              </div>
+              <div className="truncate text-xs font-semibold text-purple-400">
+                {destination?.name ?? t("detail.unknown")}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <dt className="text-muted-foreground">
+              {t("integrations.form.criticalLevel")}
+            </dt>
+            <dd className="mt-0.5 font-medium capitalize">
+              {integration.criticalLevel}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("integrations.form.owner")}
+            </dt>
+            <dd className="mt-0.5 font-medium">
+              {integration.owner || t("common.unassigned")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("integrations.form.errorRate")}
+            </dt>
+            <dd className="mt-0.5 font-medium">
+              {integration.errorRate ?? 0}%
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">{t("detail.lastSync")}</dt>
+            <dd className="mt-0.5 font-medium">
+              {integration.lastSync?.slice(0, 16).replace("T", " ") ?? "—"}
+            </dd>
+          </div>
+        </dl>
+
+        {integration.description && (
+          <div>
+            <div className="text-xs text-muted-foreground">
+              {t("common.description")}
+            </div>
+            <p className="mt-1 text-xs leading-relaxed">
+              {integration.description}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border p-3">
+        <Button asChild className="w-full" size="sm">
+          <Link to={`/integrations?selected=${integration._id}`}>
+            {t("architecture.openIntegration")}
+          </Link>
+        </Button>
+      </div>
+    </aside>
   );
 }
 
@@ -2947,6 +3134,7 @@ type ViewTab = "map" | "flow" | "gantt" | "dept";
 
 function ArchitectureContent() {
   const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
   const rawSystems = useQuery(api.software_systems.list);
   const rawIntegrations = useQuery(api.integrations.list);
   const rawModules = useQuery(api.system_modules.list);
@@ -2956,10 +3144,19 @@ function ArchitectureContent() {
   const integrations = useMemo(() => rawIntegrations ?? [], [rawIntegrations]);
   const allModules = useMemo(() => rawModules ?? [], [rawModules]);
 
-  const [viewTab, setViewTab] = useState<ViewTab>("map");
-  const [selectedId, setSelectedId] = useState<Id<"software_systems"> | null>(
-    null,
+  const initialView = searchParams.get("view");
+  const [viewTab, setViewTab] = useState<ViewTab>(
+    initialView === "flow" || initialView === "gantt" || initialView === "dept"
+      ? initialView
+      : "map",
   );
+  const [selectedId, setSelectedId] = useState<Id<"software_systems"> | null>(
+    () => searchParams.get("system") as Id<"software_systems"> | null,
+  );
+  const [selectedIntegrationId, setSelectedIntegrationId] =
+    useState<Id<"integrations"> | null>(
+      () => searchParams.get("integration") as Id<"integrations"> | null,
+    );
   const [filterType, setFilterType] = useState<string>("all");
   const [filterHealth, setFilterHealth] = useState<string>("all");
   const [edgeFocus, setEdgeFocus] = useState<EdgeFocus>("all");
@@ -2968,11 +3165,69 @@ function ArchitectureContent() {
   const [hiddenZoneKeys, setHiddenZoneKeys] = useState<Set<SystemZoneKey>>(
     () => new Set(),
   );
+  const [showHelp, setShowHelp] = useState(false);
+  const [showQuickRead, setShowQuickRead] = useState(true);
+  // Imperative handle to the canvas instead of useReactFlow(), because the
+  // toolbar/panels that need to trigger a fit live outside <ReactFlow>'s own
+  // subtree (useReactFlow() only works inside it without a separate
+  // <ReactFlowProvider> wrapper).
+  const reactFlowRef = useRef<ReactFlowInstance | null>(null);
+  const handleFitAll = () => {
+    reactFlowRef.current?.fitView({ padding: 0.06, duration: 300 });
+  };
+  const handleFocusZoneCamera = (nodeIds: string[]) => {
+    if (!nodeIds.length) return;
+    reactFlowRef.current?.fitView({
+      nodes: nodeIds.map((id) => ({ id })),
+      padding: 0.25,
+      duration: 300,
+    });
+  };
 
   const selectedSystem = useMemo(
     () => systems.find((s) => s._id === selectedId) ?? null,
     [systems, selectedId],
   );
+  const selectedIntegration = useMemo(
+    () =>
+      integrations.find(
+        (integration) => integration._id === selectedIntegrationId,
+      ) ?? null,
+    [integrations, selectedIntegrationId],
+  );
+
+  useEffect(() => {
+    if (rawSystems === undefined || rawIntegrations === undefined) return;
+    const next = new URLSearchParams(searchParams);
+    if (viewTab === "map") next.delete("view");
+    else next.set("view", viewTab);
+    if (selectedSystem) next.set("system", selectedSystem._id);
+    else next.delete("system");
+    if (selectedIntegration) next.set("integration", selectedIntegration._id);
+    else next.delete("integration");
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [
+    rawSystems,
+    rawIntegrations,
+    searchParams,
+    selectedIntegration,
+    selectedSystem,
+    setSearchParams,
+    viewTab,
+  ]);
+
+  const selectSystem = (id: Id<"software_systems"> | null) => {
+    setSelectedIntegrationId(null);
+    setSelectedId(id);
+  };
+
+  const selectIntegration = (id: Id<"integrations"> | null) => {
+    setSelectedId(null);
+    setSelectedZoneKey(null);
+    setSelectedIntegrationId(id);
+  };
   const selectedModules = useMemo(
     () => allModules.filter((m) => m.systemId === selectedId),
     [allModules, selectedId],
@@ -3172,6 +3427,18 @@ function ArchitectureContent() {
     systemGroupMap,
   ]);
 
+  // Derived from the same `nodes` array the canvas actually renders, so
+  // this count can never drift from what filters/hide/selection/lens are
+  // doing to opacity — "visible" used to just mean type+health filter
+  // match, which could say "20/20 hệ thống" while most nodes were faded to
+  // near-invisible by an active zone focus or hidden zone
+  // (.ai/architecture-overview-ux-review.md, "visible" vocabulary issue).
+  const emphasizedSystemCount = useMemo(
+    () =>
+      nodes.filter((n) => n.type === "system" && n.style?.opacity === 1).length,
+    [nodes],
+  );
+
   const edges: Edge[] = useMemo(
     () =>
       integrations.map((intg) => {
@@ -3194,6 +3461,7 @@ function ArchitectureContent() {
               : matchesEdgeFocus
             : matchesEdgeFocus;
         const isFocused =
+          selectedIntegrationId === intg._id ||
           selectedId === intg.sourceSystemId ||
           selectedId === intg.destinationSystemId;
         const isFiltered =
@@ -3215,7 +3483,7 @@ function ArchitectureContent() {
         const isZoneEdge = sourceInZone || targetInZone || isZoneToHubEdge;
         const edgeOpacity = isHiddenEdge
           ? 0.025
-          : selectedId
+          : selectedId || selectedIntegrationId
             ? isFocused && matchesEdgeFocus
               ? 1
               : 0.1
@@ -3250,11 +3518,13 @@ function ArchitectureContent() {
           style: {
             stroke: hc.color,
             strokeWidth:
-              intg.criticalLevel === "high"
-                ? 2.5
-                : intg.criticalLevel === "medium"
-                  ? 1.8
-                  : 1.2,
+              selectedIntegrationId === intg._id
+                ? 4
+                : intg.criticalLevel === "high"
+                  ? 2.5
+                  : intg.criticalLevel === "medium"
+                    ? 1.8
+                    : 1.2,
             strokeDasharray: !intg.isArchitectureCompliant ? "6,4" : undefined,
             opacity: edgeOpacity,
           },
@@ -3270,6 +3540,7 @@ function ArchitectureContent() {
     [
       integrations,
       selectedId,
+      selectedIntegrationId,
       selectedZoneKey,
       mapMode,
       filteredIds,
@@ -3304,6 +3575,15 @@ function ArchitectureContent() {
     const nonCompliantIntegrations = integrations.filter(
       (i) => !i.isArchitectureCompliant,
     ).length;
+    // Deduped, single-unit "flows needing attention" — issueIntegrations +
+    // nonCompliantIntegrations double-counts any flow that is both
+    // degraded/down AND non-compliant (.ai/architecture-overview-ux-review.md,
+    // "Summary có thể gây hiểu sai").
+    const flowsNeedingAttention = integrations.filter(
+      (i) =>
+        ["degraded", "down"].includes(i.healthStatus) ||
+        !i.isArchitectureCompliant,
+    ).length;
     const highDebtSystems = systems.filter(
       (s) => s.technicalDebtScore >= 70,
     ).length;
@@ -3333,10 +3613,14 @@ function ArchitectureContent() {
         systems.length - architectureLayout.centralIds.size,
         0,
       ),
-      visibleSystems: filteredSystems.length,
+      // Systems actually standing out on the canvas right now (opacity 1),
+      // not just the ones matching the type/health filter — see
+      // emphasizedSystemCount above for why these must stay in sync.
+      emphasizedSystems: emphasizedSystemCount,
       criticalIntegrations,
       issueIntegrations,
       nonCompliantIntegrations,
+      flowsNeedingAttention,
       highDebtSystems,
       highRiskSystems,
       criticalSystems,
@@ -3349,12 +3633,11 @@ function ArchitectureContent() {
     integrations,
     integrationMetrics,
     architectureLayout,
-    filteredSystems,
+    emphasizedSystemCount,
   ]);
 
   const handleSetViewTab = (tab: ViewTab) => {
     setViewTab(tab);
-    setSelectedId(null);
     setSelectedZoneKey(null);
     setHiddenZoneKeys(new Set());
   };
@@ -3362,7 +3645,20 @@ function ArchitectureContent() {
   const handleSetSelectedZone = (zoneKey: SystemZoneKey) => {
     if (hiddenZoneKeys.has(zoneKey)) return;
     setSelectedId(null);
-    setSelectedZoneKey((current) => (current === zoneKey ? null : zoneKey));
+    setSelectedIntegrationId(null);
+    const isSameZone = selectedZoneKey === zoneKey;
+    setSelectedZoneKey(isSameZone ? null : zoneKey);
+    // "Focus cụm" should actually move the camera to that cluster, not just
+    // dim everything else while the viewport stays put
+    // (.ai/architecture-overview-ux-review.md, camera section).
+    if (isSameZone) {
+      handleFitAll();
+    } else {
+      const nodeIds = systems
+        .filter((s) => systemGroupMap.get(s._id) === zoneKey)
+        .map((s) => s._id);
+      handleFocusZoneCamera(nodeIds);
+    }
   };
 
   const handleToggleZoneVisibility = (zoneKey: SystemZoneKey) => {
@@ -3384,8 +3680,14 @@ function ArchitectureContent() {
     });
   };
 
+  const activeFilterCount =
+    (filterHealth !== "all" ? 1 : 0) +
+    (filterType !== "all" ? 1 : 0) +
+    (edgeFocus !== "all" ? 1 : 0);
+
   const hasMapFocus =
     selectedId !== null ||
+    selectedIntegrationId !== null ||
     selectedZoneKey !== null ||
     filterType !== "all" ||
     filterHealth !== "all" ||
@@ -3395,12 +3697,14 @@ function ArchitectureContent() {
 
   const handleClearMapFocus = () => {
     setSelectedId(null);
+    setSelectedIntegrationId(null);
     setSelectedZoneKey(null);
     setFilterType("all");
     setFilterHealth("all");
     setEdgeFocus("all");
     setMapMode("ecosystem");
     setHiddenZoneKeys(new Set());
+    handleFitAll();
   };
 
   if (rawSystems === undefined || rawIntegrations === undefined) {
@@ -3486,72 +3790,133 @@ function ArchitectureContent() {
               ))}
             </div>
             <div className="w-px h-5 bg-border" />
-            {(["healthy", "degraded", "down", "unknown"] as const).map((h) => {
-              const hc = HEALTH_META[h];
-              return (
-                <button
-                  key={h}
-                  onClick={() =>
-                    setFilterHealth(filterHealth === h ? "all" : h)
-                  }
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
-                  style={{
-                    background:
-                      filterHealth === h ? `${hc.color}22` : "transparent",
-                    borderColor: filterHealth === h ? hc.color : "#1e293b",
-                    color: hc.color,
-                  }}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: hc.color }}
-                  />
-                  {t(`health.${h}`)} {healthSummary[h] ?? 0}
+            <button
+              onClick={handleFitAll}
+              title="Về toàn cảnh"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 cursor-pointer transition-colors"
+            >
+              <Maximize2 className="h-3 w-3" /> Về toàn cảnh
+            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                  <SlidersHorizontal className="h-3 w-3" />
+                  Bộ lọc
+                  {activeFilterCount > 0 && (
+                    <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-indigo-500 text-[10px] font-bold text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
                 </button>
-              );
-            })}
-            <div className="w-px h-5 bg-border" />
-            {(["all", "core", "supporting", "legacy", "pilot"] as const).map(
-              (ft) => (
-                <button
-                  key={ft}
-                  onClick={() => setFilterType(ft)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
-                  style={{
-                    background: filterType === ft ? "#6366f133" : "transparent",
-                    borderColor: filterType === ft ? "#6366f1" : "#1e293b",
-                    color: filterType === ft ? "#c7d2fe" : "#64748b",
-                  }}
-                >
-                  {ft === "all"
-                    ? t("systemType.allTypes")
-                    : t(`systemType.${ft}`)}
-                </button>
-              ),
-            )}
-            <div className="w-px h-5 bg-border" />
-            {(
-              [
-                ["all", "Tất cả luồng"],
-                ["critical", "Critical"],
-                ["issues", "Có lỗi"],
-                ["nonCompliant", "Sai chuẩn"],
-                ["realtime", "Realtime"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setEdgeFocus(key)}
-                className="px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
-                style={{
-                  background: edgeFocus === key ? "#f9731633" : "transparent",
-                  borderColor: edgeFocus === key ? "#f97316" : "#1e293b",
-                  color: edgeFocus === key ? "#fed7aa" : "#64748b",
-                }}
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-[360px] bg-slate-950/95 border-slate-700 text-slate-200"
               >
-                {label}
-              </button>
-            ))}
+                <div className="space-y-3">
+                  <div>
+                    <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Sức khoẻ luồng
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        ["healthy", "degraded", "down", "unknown"] as const
+                      ).map((h) => {
+                        const hc = HEALTH_META[h];
+                        return (
+                          <button
+                            key={h}
+                            onClick={() =>
+                              setFilterHealth(filterHealth === h ? "all" : h)
+                            }
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
+                            style={{
+                              background:
+                                filterHealth === h
+                                  ? `${hc.color}22`
+                                  : "transparent",
+                              borderColor:
+                                filterHealth === h ? hc.color : "#334155",
+                              color: hc.color,
+                            }}
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ background: hc.color }}
+                            />
+                            {t(`health.${h}`)} {healthSummary[h] ?? 0}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Loại hệ thống
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          "all",
+                          "core",
+                          "supporting",
+                          "legacy",
+                          "pilot",
+                        ] as const
+                      ).map((ft) => (
+                        <button
+                          key={ft}
+                          onClick={() => setFilterType(ft)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
+                          style={{
+                            background:
+                              filterType === ft ? "#6366f133" : "transparent",
+                            borderColor:
+                              filterType === ft ? "#6366f1" : "#334155",
+                            color: filterType === ft ? "#c7d2fe" : "#94a3b8",
+                          }}
+                        >
+                          {ft === "all"
+                            ? t("systemType.allTypes")
+                            : t(`systemType.${ft}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Luồng tích hợp
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          ["all", "Tất cả luồng"],
+                          ["critical", "Critical"],
+                          ["issues", "Có lỗi"],
+                          ["nonCompliant", "Sai chuẩn"],
+                          ["realtime", "Realtime"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <button
+                          key={key}
+                          onClick={() => setEdgeFocus(key)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
+                          style={{
+                            background:
+                              edgeFocus === key ? "#f9731633" : "transparent",
+                            borderColor:
+                              edgeFocus === key ? "#f97316" : "#334155",
+                            color: edgeFocus === key ? "#fed7aa" : "#94a3b8",
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             {selectedId && (
               <button
                 onClick={() => setSelectedId(null)}
@@ -3706,253 +4071,337 @@ function ArchitectureContent() {
                   fitViewOptions={{ padding: 0.06 }}
                   minZoom={0.08}
                   maxZoom={1.8}
+                  onInit={(instance) => {
+                    reactFlowRef.current = instance;
+                  }}
                   attributionPosition="bottom-right"
                   proOptions={{ hideAttribution: true }}
                   onNodeClick={(_evt, node) => {
                     if (isZoneNodeId(node.id)) return;
                     setSelectedZoneKey(null);
-                    setSelectedId(node.id as Id<"software_systems">);
+                    selectSystem(node.id as Id<"software_systems">);
                   }}
-                  onPaneClick={() => setSelectedId(null)}
+                  onEdgeClick={(_evt, edge) =>
+                    selectIntegration(edge.id as Id<"integrations">)
+                  }
+                  onPaneClick={() => {
+                    setSelectedId(null);
+                    setSelectedIntegrationId(null);
+                  }}
                 >
-                  <div className="absolute left-4 top-4 z-10 max-w-[320px] rounded-lg border border-slate-700/80 bg-slate-950/85 px-3 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
-                    <div className="mb-1 font-semibold text-slate-100">
-                      Bản đồ hệ sinh thái kiến trúc
-                    </div>
-                    <div className="space-y-0.5">
-                      <div>
-                        <span className="text-indigo-300">Trung tâm:</span> hub
-                        có nhiều kết nối và mức trọng yếu cao
-                      </div>
-                      <div>
-                        <span className="text-emerald-300">Xung quanh:</span>{" "}
-                        cụm vệ tinh theo vai trò nghiệp vụ/nền tảng
-                      </div>
-                      <div>
-                        <span className="text-amber-300">Luồng:</span> click hệ
-                        thống để soi kết nối và chi tiết tích hợp
-                      </div>
-                      <div>
-                        <span className="text-sky-300">Hub:</span> tính theo kết
-                        nối + core + criticality + active + arch score
-                      </div>
-                    </div>
+                  <div className="absolute left-4 top-4 z-10">
+                    <Popover open={showHelp} onOpenChange={setShowHelp}>
+                      <PopoverTrigger asChild>
+                        <button
+                          title="Cách đọc sơ đồ"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-950/85 text-slate-300 shadow-lg backdrop-blur hover:text-white cursor-pointer transition-colors"
+                        >
+                          <Info className="h-3.5 w-3.5" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        className="w-[300px] bg-slate-950/95 border-slate-700 text-[10px] text-slate-300"
+                      >
+                        <div className="mb-1 font-semibold text-slate-100">
+                          {mapMode === "risk"
+                            ? "Cách đọc Risk lens"
+                            : "Cách đọc bản đồ hệ sinh thái"}
+                        </div>
+                        {mapMode === "risk" ? (
+                          <div className="space-y-0.5">
+                            <div>
+                              <span className="text-red-300">Đỏ:</span> risk cao
+                              / down / nợ kỹ thuật ≥ 70 — cần xử lý trước
+                            </div>
+                            <div>
+                              <span className="text-amber-300">Cam:</span> cần
+                              theo dõi / degraded / nợ 40-69
+                            </div>
+                            <div>
+                              <span className="text-emerald-300">Xanh:</span> ổn
+                              định
+                            </div>
+                            <div>
+                              <span className="text-amber-300">Luồng:</span>{" "}
+                              click hệ thống để soi kết nối và chi tiết
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div>
+                              <span className="text-indigo-300">
+                                Trung tâm:
+                              </span>{" "}
+                              hub có nhiều kết nối và mức trọng yếu cao
+                            </div>
+                            <div>
+                              <span className="text-emerald-300">
+                                Xung quanh:
+                              </span>{" "}
+                              cụm vệ tinh theo vai trò nghiệp vụ/nền tảng
+                            </div>
+                            <div>
+                              <span className="text-amber-300">Luồng:</span>{" "}
+                              click hệ thống để soi kết nối và chi tiết tích hợp
+                            </div>
+                            <div>
+                              <span className="text-sky-300">Hub:</span> tính
+                              theo kết nối + core + criticality + active + arch
+                              score
+                            </div>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                  <div className="absolute right-4 top-4 z-10 w-[300px] rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div>
+                  <div
+                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "w-[300px]" : ""}`}
+                  >
+                    <button
+                      onClick={() => setShowQuickRead((v) => !v)}
+                      className="flex w-full items-center justify-between gap-2 cursor-pointer"
+                      title={showQuickRead ? "Thu gọn" : "Mở rộng"}
+                    >
+                      <div className="text-left">
                         <div className="text-xs font-semibold text-slate-100">
                           {mapMode === "risk"
                             ? "Đọc nhanh rủi ro"
                             : "Đọc nhanh hệ sinh thái"}
                         </div>
-                        <div className="text-[10px] text-slate-400">
-                          {architectureSummary.visibleSystems}/{systems.length}{" "}
-                          hệ thống · {architectureSummary.zones} cụm vệ tinh
-                        </div>
+                        {showQuickRead && (
+                          <div className="text-[10px] text-slate-400">
+                            {architectureSummary.emphasizedSystems}/
+                            {systems.length} hệ thống nổi bật ·{" "}
+                            {architectureSummary.zones} cụm vệ tinh
+                          </div>
+                        )}
                       </div>
-                      <div className="rounded-full border border-indigo-400/40 bg-indigo-400/10 px-2 py-1 text-[10px] font-semibold text-indigo-200">
-                        {mapMode === "risk" ? "Risk lens" : "Ecosystem"}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="rounded-full border border-indigo-400/40 bg-indigo-400/10 px-2 py-1 text-[10px] font-semibold text-indigo-200">
+                          {mapMode === "risk" ? "Risk lens" : "Ecosystem"}
+                        </span>
+                        {showQuickRead ? (
+                          <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        )}
                       </div>
-                    </div>
-                    {mapMode === "risk" ? (
-                      <div className="grid grid-cols-2 gap-2 text-[10px]">
-                        <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
-                          <div className="text-slate-400">Risk cao</div>
-                          <div className="text-lg font-bold text-red-200">
-                            {architectureSummary.highRiskSystems}
+                    </button>
+                    {showQuickRead && (
+                      <>
+                        {mapMode === "risk" ? (
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
+                              <div className="text-slate-400">Risk cao</div>
+                              <div className="text-lg font-bold text-red-200">
+                                {architectureSummary.highRiskSystems}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 p-2">
+                              <div className="text-slate-400">
+                                Nợ kỹ thuật cao
+                              </div>
+                              <div className="text-lg font-bold text-amber-200">
+                                {architectureSummary.highDebtSystems}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
+                              <div className="text-slate-400">Luồng lỗi</div>
+                              <div className="text-lg font-bold text-orange-200">
+                                {architectureSummary.issueIntegrations}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-rose-400/20 bg-rose-400/10 p-2">
+                              <div className="text-slate-400">Sai chuẩn</div>
+                              <div className="text-lg font-bold text-rose-200">
+                                {architectureSummary.nonCompliantIntegrations}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
+                              <div className="text-slate-400">
+                                Critical system
+                              </div>
+                              <div className="text-lg font-bold text-indigo-200">
+                                {architectureSummary.criticalSystems}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/10 p-2">
+                              <div className="text-slate-400">
+                                Hub ảnh hưởng
+                              </div>
+                              <div className="text-lg font-bold text-fuchsia-200">
+                                {architectureSummary.affectedHubs}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 p-2">
-                          <div className="text-slate-400">Nợ kỹ thuật cao</div>
-                          <div className="text-lg font-bold text-amber-200">
-                            {architectureSummary.highDebtSystems}
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
+                              <div className="text-slate-400">
+                                Hub trung tâm
+                              </div>
+                              <div className="text-lg font-bold text-indigo-200">
+                                {architectureSummary.hubs}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-2">
+                              <div className="text-slate-400">Vệ tinh</div>
+                              <div className="text-lg font-bold text-emerald-200">
+                                {architectureSummary.satellites}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
+                              <div className="text-slate-400">
+                                Critical flow
+                              </div>
+                              <div className="text-lg font-bold text-orange-200">
+                                {architectureSummary.criticalIntegrations}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
+                              <div className="text-slate-400">
+                                Luồng cần chú ý
+                              </div>
+                              <div className="text-lg font-bold text-red-200">
+                                {architectureSummary.flowsNeedingAttention}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
-                          <div className="text-slate-400">Luồng lỗi</div>
-                          <div className="text-lg font-bold text-orange-200">
-                            {architectureSummary.issueIntegrations}
+                        )}
+                        <div className="mt-3 border-t border-slate-700/70 pt-2">
+                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                            Focus cụm
                           </div>
-                        </div>
-                        <div className="rounded-lg border border-rose-400/20 bg-rose-400/10 p-2">
-                          <div className="text-slate-400">Sai chuẩn</div>
-                          <div className="text-lg font-bold text-rose-200">
-                            {architectureSummary.nonCompliantIntegrations}
-                          </div>
-                        </div>
-                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
-                          <div className="text-slate-400">Critical system</div>
-                          <div className="text-lg font-bold text-indigo-200">
-                            {architectureSummary.criticalSystems}
-                          </div>
-                        </div>
-                        <div className="rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/10 p-2">
-                          <div className="text-slate-400">Hub ảnh hưởng</div>
-                          <div className="text-lg font-bold text-fuchsia-200">
-                            {architectureSummary.affectedHubs}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 text-[10px]">
-                        <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
-                          <div className="text-slate-400">Hub trung tâm</div>
-                          <div className="text-lg font-bold text-indigo-200">
-                            {architectureSummary.hubs}
-                          </div>
-                        </div>
-                        <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-2">
-                          <div className="text-slate-400">Vệ tinh</div>
-                          <div className="text-lg font-bold text-emerald-200">
-                            {architectureSummary.satellites}
-                          </div>
-                        </div>
-                        <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
-                          <div className="text-slate-400">Critical flow</div>
-                          <div className="text-lg font-bold text-orange-200">
-                            {architectureSummary.criticalIntegrations}
-                          </div>
-                        </div>
-                        <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
-                          <div className="text-slate-400">Cần chú ý</div>
-                          <div className="text-lg font-bold text-red-200">
-                            {architectureSummary.issueIntegrations +
-                              architectureSummary.nonCompliantIntegrations +
-                              architectureSummary.highDebtSystems}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="mt-3 border-t border-slate-700/70 pt-2">
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                        Focus cụm
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => handleSetSelectedZone("core")}
-                          className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
-                          style={{
-                            borderColor:
-                              selectedZoneKey === "core"
-                                ? "#a78bfa"
-                                : "#334155",
-                            color:
-                              selectedZoneKey === "core"
-                                ? "#ddd6fe"
-                                : "#94a3b8",
-                            background:
-                              selectedZoneKey === "core"
-                                ? "#a78bfa22"
-                                : "transparent",
-                          }}
-                        >
-                          Trung tâm
-                        </button>
-                        {(
-                          Object.entries(ECOSYSTEM_GROUPS) as [
-                            EcosystemGroupKey,
-                            EcosystemGroupConfig,
-                          ][]
-                        ).map(([key, group]) => {
-                          const hasZone = architectureLayout.zones.some(
-                            (zone) => zone.id === `zone-${key}`,
-                          );
-                          if (!hasZone) return null;
-                          return (
+                          <div className="flex flex-wrap gap-1.5">
                             <button
-                              key={key}
-                              onClick={() => handleSetSelectedZone(key)}
+                              onClick={() => handleSetSelectedZone("core")}
                               className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
                               style={{
                                 borderColor:
-                                  selectedZoneKey === key
-                                    ? group.accent
+                                  selectedZoneKey === "core"
+                                    ? "#a78bfa"
                                     : "#334155",
                                 color:
-                                  selectedZoneKey === key
-                                    ? "#f8fafc"
+                                  selectedZoneKey === "core"
+                                    ? "#ddd6fe"
                                     : "#94a3b8",
                                 background:
-                                  selectedZoneKey === key
-                                    ? `${group.accent}26`
+                                  selectedZoneKey === "core"
+                                    ? "#a78bfa22"
                                     : "transparent",
                               }}
                             >
-                              {group.title.split(" & ")[0]}
+                              Trung tâm
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="mt-3 border-t border-slate-700/70 pt-2">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                          Ẩn/hiện cụm
-                        </span>
-                        {hiddenZoneKeys.size > 0 && (
-                          <button
-                            onClick={() => setHiddenZoneKeys(new Set())}
-                            className="text-[10px] font-medium text-sky-300 hover:text-sky-200"
-                          >
-                            Hiện tất cả
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => handleToggleZoneVisibility("core")}
-                          className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
-                          style={{
-                            borderColor: hiddenZoneKeys.has("core")
-                              ? "#475569"
-                              : "#a78bfa",
-                            color: hiddenZoneKeys.has("core")
-                              ? "#64748b"
-                              : "#ddd6fe",
-                            background: hiddenZoneKeys.has("core")
-                              ? "transparent"
-                              : "#a78bfa22",
-                            opacity: hiddenZoneKeys.has("core") ? 0.75 : 1,
-                          }}
-                        >
-                          {hiddenZoneKeys.has("core") ? "Ẩn" : "Hiện"} · Trung
-                          tâm
-                        </button>
-                        {(
-                          Object.entries(ECOSYSTEM_GROUPS) as [
-                            EcosystemGroupKey,
-                            EcosystemGroupConfig,
-                          ][]
-                        ).map(([key, group]) => {
-                          const hasZone = architectureLayout.zones.some(
-                            (zone) => zone.id === `zone-${key}`,
-                          );
-                          if (!hasZone) return null;
-                          const isHidden = hiddenZoneKeys.has(key);
-                          return (
+                            {(
+                              Object.entries(ECOSYSTEM_GROUPS) as [
+                                EcosystemGroupKey,
+                                EcosystemGroupConfig,
+                              ][]
+                            ).map(([key, group]) => {
+                              const hasZone = architectureLayout.zones.some(
+                                (zone) => zone.id === `zone-${key}`,
+                              );
+                              if (!hasZone) return null;
+                              return (
+                                <button
+                                  key={key}
+                                  onClick={() => handleSetSelectedZone(key)}
+                                  className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
+                                  style={{
+                                    borderColor:
+                                      selectedZoneKey === key
+                                        ? group.accent
+                                        : "#334155",
+                                    color:
+                                      selectedZoneKey === key
+                                        ? "#f8fafc"
+                                        : "#94a3b8",
+                                    background:
+                                      selectedZoneKey === key
+                                        ? `${group.accent}26`
+                                        : "transparent",
+                                  }}
+                                >
+                                  {group.title.split(" & ")[0]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="mt-3 border-t border-slate-700/70 pt-2">
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                              Ẩn/hiện cụm
+                            </span>
+                            {hiddenZoneKeys.size > 0 && (
+                              <button
+                                onClick={() => setHiddenZoneKeys(new Set())}
+                                className="text-[10px] font-medium text-sky-300 hover:text-sky-200"
+                              >
+                                Hiện tất cả
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
                             <button
-                              key={key}
-                              onClick={() => handleToggleZoneVisibility(key)}
+                              onClick={() => handleToggleZoneVisibility("core")}
                               className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
                               style={{
-                                borderColor: isHidden
+                                borderColor: hiddenZoneKeys.has("core")
                                   ? "#475569"
-                                  : group.accent,
-                                color: isHidden ? "#64748b" : "#f8fafc",
-                                background: isHidden
+                                  : "#a78bfa",
+                                color: hiddenZoneKeys.has("core")
+                                  ? "#64748b"
+                                  : "#ddd6fe",
+                                background: hiddenZoneKeys.has("core")
                                   ? "transparent"
-                                  : `${group.accent}26`,
-                                opacity: isHidden ? 0.75 : 1,
+                                  : "#a78bfa22",
+                                opacity: hiddenZoneKeys.has("core") ? 0.75 : 1,
                               }}
                             >
-                              {isHidden ? "Ẩn" : "Hiện"} ·{" "}
-                              {group.title.split(" & ")[0]}
+                              {hiddenZoneKeys.has("core") ? "Ẩn" : "Hiện"} ·
+                              Trung tâm
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                            {(
+                              Object.entries(ECOSYSTEM_GROUPS) as [
+                                EcosystemGroupKey,
+                                EcosystemGroupConfig,
+                              ][]
+                            ).map(([key, group]) => {
+                              const hasZone = architectureLayout.zones.some(
+                                (zone) => zone.id === `zone-${key}`,
+                              );
+                              if (!hasZone) return null;
+                              const isHidden = hiddenZoneKeys.has(key);
+                              return (
+                                <button
+                                  key={key}
+                                  onClick={() =>
+                                    handleToggleZoneVisibility(key)
+                                  }
+                                  className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
+                                  style={{
+                                    borderColor: isHidden
+                                      ? "#475569"
+                                      : group.accent,
+                                    color: isHidden ? "#64748b" : "#f8fafc",
+                                    background: isHidden
+                                      ? "transparent"
+                                      : `${group.accent}26`,
+                                    opacity: isHidden ? 0.75 : 1,
+                                  }}
+                                >
+                                  {isHidden ? "Ẩn" : "Hiện"} ·{" "}
+                                  {group.title.split(" & ")[0]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <Background color="#1e293b" gap={28} size={1} />
                   <Controls
@@ -3979,19 +4428,27 @@ function ArchitectureContent() {
             </div>
             <div
               className={`shrink-0 transition-all duration-300 overflow-hidden ${
-                selectedSystem ? "w-[340px]" : "w-0"
+                selectedSystem || selectedIntegration ? "w-[340px]" : "w-0"
               }`}
             >
-              {selectedSystem && (
+              {selectedIntegration ? (
+                <IntegrationInspector
+                  integration={selectedIntegration}
+                  systems={systems}
+                  onClose={() => selectIntegration(null)}
+                  onSelectSystem={selectSystem}
+                />
+              ) : selectedSystem ? (
                 <DetailPanel
                   key={selectedSystem._id}
                   system={selectedSystem}
                   integrations={integrations}
                   systems={systems}
                   modules={selectedModules}
-                  onClose={() => setSelectedId(null)}
+                  onClose={() => selectSystem(null)}
+                  onSelectIntegration={selectIntegration}
                 />
-              )}
+              ) : null}
             </div>
           </div>
         </>

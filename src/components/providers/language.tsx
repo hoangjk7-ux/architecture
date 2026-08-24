@@ -62,6 +62,11 @@ const translations: TranslationMap = {
   "detail.more": { vi: "thêm", en: "more" },
   "detail.overview": { vi: "Tổng quan", en: "Overview" },
   "detail.integrations": { vi: "Tích hợp", en: "Integrations" },
+  "detail.integration": { vi: "Tích hợp", en: "Integration" },
+  "architecture.openIntegration": {
+    vi: "Mở trang quản lý tích hợp",
+    en: "Open integration management",
+  },
   "detail.outbound": { vi: "Đi ra", en: "Outbound" },
   "detail.inbound": { vi: "Đi vào", en: "Inbound" },
   "detail.noIntegrations": {
@@ -100,7 +105,9 @@ const translations: TranslationMap = {
   "common.add": { vi: "Thêm", en: "Add" },
   "common.edit": { vi: "Sửa", en: "Edit" },
   "common.delete": { vi: "Xoá", en: "Delete" },
+  "common.deleting": { vi: "Đang xoá…", en: "Deleting…" },
   "common.cancel": { vi: "Huỷ", en: "Cancel" },
+  "common.close": { vi: "Đóng", en: "Close" },
   "common.save": { vi: "Lưu", en: "Save" },
   "common.saving": { vi: "Đang lưu…", en: "Saving…" },
   "common.search": { vi: "Tìm kiếm", en: "Search" },
@@ -537,6 +544,18 @@ const translations: TranslationMap = {
   },
   "integrations.toast.updated": { vi: "Đã cập nhật", en: "Updated" },
   "integrations.toast.removed": { vi: "Đã xoá", en: "Removed" },
+  "integrations.toast.removeFailed": {
+    vi: "Không thể xoá tích hợp",
+    en: "Failed to remove integration",
+  },
+  "integrations.delete.title": {
+    vi: "Xoá tích hợp?",
+    en: "Delete integration?",
+  },
+  "integrations.delete.description": {
+    vi: "Tích hợp “{name}” sẽ bị xoá vĩnh viễn. Hành động này không thể hoàn tác.",
+    en: "Integration “{name}” will be permanently deleted. This action cannot be undone.",
+  },
 
   // ─── Architecture page ───────────────────────────────────────────────────
   "arch.tab.map": { vi: "Sơ đồ kiến trúc", en: "Architecture Map" },

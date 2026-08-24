@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
@@ -12,6 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import {
   Select,
   SelectContent,
@@ -372,9 +383,10 @@ function IntegrationForm({
 
 function IntegrationsContent() {
   const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { canWrite } = useCurrentUser();
   const rawIntegrations = useQuery(api.integrations.list);
-  const integrations = rawIntegrations ?? [];
+  const integrations = useMemo(() => rawIntegrations ?? [], [rawIntegrations]);
   const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const stats = useQuery(
     api.integrations.getStats,
@@ -386,6 +398,43 @@ function IntegrationsContent() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<(typeof integrations)[0] | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    (typeof integrations)[0] | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const selectedId = searchParams.get("selected");
+
+  useEffect(() => {
+    if (!canWrite || rawIntegrations === undefined || !selectedId || editing)
+      return;
+    const match = integrations.find(
+      (integration) => integration._id === selectedId,
+    );
+    if (match) setEditing(match);
+  }, [canWrite, editing, integrations, rawIntegrations, selectedId]);
+
+  const closeEditor = () => {
+    setEditing(null);
+    if (selectedId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("selected");
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await removeIntegration({ id: deleteTarget._id });
+      toast.success(t("integrations.toast.removed"));
+      setDeleteTarget(null);
+    } catch {
+      toast.error(t("integrations.toast.removeFailed"));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleCreate = async (data: IntegrationFormData) => {
     await createIntegration(data);
@@ -395,7 +444,7 @@ function IntegrationsContent() {
     if (!editing) return;
     await updateIntegration({ id: editing._id, ...data });
     toast.success(t("integrations.toast.updated"));
-    setEditing(null);
+    closeEditor();
   };
 
   return (
@@ -480,7 +529,9 @@ function IntegrationsContent() {
                 return (
                   <tr
                     key={i._id}
-                    className="border-b border-border/50 hover:bg-accent/30 transition-colors"
+                    className={`border-b border-border/50 hover:bg-accent/30 transition-colors ${
+                      selectedId === i._id ? "bg-primary/10" : ""
+                    }`}
                   >
                     <td className="p-3 font-medium">{i.name}</td>
                     <td className="p-3 text-xs">
@@ -535,10 +586,8 @@ function IntegrationsContent() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 cursor-pointer text-destructive hover:text-destructive"
-                            onClick={() => {
-                              removeIntegration({ id: i._id });
-                              toast.success(t("integrations.toast.removed"));
-                            }}
+                            aria-label={`${t("common.delete")} ${i.name}`}
+                            onClick={() => setDeleteTarget(i)}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -564,10 +613,7 @@ function IntegrationsContent() {
           />
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={!!editing}
-        onOpenChange={(open) => !open && setEditing(null)}
-      >
+      <Dialog open={!!editing} onOpenChange={(open) => !open && closeEditor()}>
         <DialogContent className="max-w-xl bg-card border-border">
           <DialogHeader>
             <DialogTitle>{t("integrations.editIntegration")}</DialogTitle>
@@ -576,11 +622,45 @@ function IntegrationsContent() {
             <IntegrationForm
               initial={editing}
               onSave={handleUpdate}
-              onClose={() => setEditing(null)}
+              onClose={closeEditor}
             />
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && !isDeleting && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("integrations.delete.title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("integrations.delete.description").replace(
+                "{name}",
+                deleteTarget?.name ?? "",
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? t("common.deleting") : t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
