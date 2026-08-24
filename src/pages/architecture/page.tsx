@@ -950,12 +950,25 @@ function placeGrid(
 }
 
 function zoneSizeFor(count: number) {
-  const columns = count > 3 ? 2 : 1;
+  // A fixed 1-2 column grid makes zone height grow linearly with count —
+  // a real dataset skewed toward one bucket (e.g. many systems falling
+  // through to the "workspace" catch-all in classifyEcosystemGroup) can
+  // produce a zone thousands of pixels tall that dwarfs its row neighbor
+  // and forces fitView far past what's still readable
+  // (.ai/architecture-overview-ux-review.md, P1.4 — verified numerically:
+  // 30 systems in one group was ~2546px tall under the old formula).
+  // Scaling columns with sqrt(count) keeps the zone closer to
+  // square-shaped instead of an ever-taller single/double column. Cap at
+  // three columns so the 4-corner ecosystem layout stays balanced instead of
+  // becoming a very wide infographic.
+  const columns = count <= 3 ? 1 : Math.min(3, Math.ceil(Math.sqrt(count)));
   const rows = Math.ceil(count / columns);
+  const width =
+    columns === 1 ? 232 : 22 + columns * 176 + (columns - 1) * 16 + 30;
   return {
     columns,
     rows,
-    width: columns === 2 ? 416 : 232,
+    width,
     height: Math.max(218, 78 + rows * 148 + (rows - 1) * 16 + 24),
   };
 }
@@ -1146,7 +1159,8 @@ function layoutNodes(
 
   const zones: ArchitectureZone[] = [];
   const rowGap = 36;
-  const colGap = 44;
+  const stackGap = 28;
+  const colGap = 36;
   const canvasLeft = 8;
   const topY = 28;
   const coreWidth = 288;
@@ -1178,20 +1192,23 @@ function layoutNodes(
 
   const zoneHeight = (key: EcosystemGroupKey) =>
     zoneSpecs.get(key)?.height ?? 0;
+  const zoneWidth = (key: EcosystemGroupKey) => zoneSpecs.get(key)?.width ?? 0;
+  const maxZoneWidth = (keys: EcosystemGroupKey[]) =>
+    Math.max(...keys.map((key) => zoneWidth(key)), 232);
+
   const topRowHeight = Math.max(
     zoneHeight("workspace"),
     zoneHeight("learning"),
     0,
   );
-  const middleRowHeight = Math.max(
-    zoneHeight("platform"),
-    centralHeight,
-    zoneHeight("automation"),
-  );
+  const leftWidth = maxZoneWidth(["workspace", "platform", "pilot"]);
+  const rightWidth = maxZoneWidth(["learning", "automation", "legacy"]);
+  const leftX = canvasLeft + 10;
+  const coreX = leftX + leftWidth + colGap;
+  const rightX = coreX + coreWidth + colGap;
   const topRowY = topY;
-  const middleRowY = topRowY + (topRowHeight || 0) + rowGap;
-  const bottomRowY = middleRowY + middleRowHeight + rowGap;
-  const coreX = canvasLeft + 442;
+  const coreY = topRowY + topRowHeight + rowGap;
+  const bottomRowY = coreY + centralHeight + rowGap;
 
   const placeZone = (key: EcosystemGroupKey, x: number, y: number) => {
     const spec = zoneSpecs.get(key);
@@ -1222,20 +1239,36 @@ function layoutNodes(
     });
   };
 
-  placeZone("workspace", canvasLeft + 10, topRowY);
-  placeZone("learning", coreX + coreWidth + colGap, topRowY);
-  placeZone(
-    "platform",
-    canvasLeft + 10,
-    middleRowY + (middleRowHeight - zoneHeight("platform")) / 2,
-  );
-  placeZone(
-    "automation",
-    coreX + coreWidth + colGap,
-    middleRowY + (middleRowHeight - zoneHeight("automation")) / 2,
-  );
+  const placeInQuadrant = (
+    key: EcosystemGroupKey,
+    x: number,
+    y: number,
+    width: number,
+  ) => {
+    const spec = zoneSpecs.get(key);
+    if (!spec) return;
+    placeZone(key, x + (width - spec.width) / 2, y);
+  };
 
-  const centerY = middleRowY + middleRowHeight / 2;
+  placeInQuadrant("workspace", leftX, topRowY, leftWidth);
+  placeInQuadrant("learning", rightX, topRowY, rightWidth);
+
+  const placeStack = (
+    keys: EcosystemGroupKey[],
+    x: number,
+    y: number,
+    width: number,
+  ) => {
+    let cursorY = y;
+    keys.forEach((key) => {
+      const spec = zoneSpecs.get(key);
+      if (!spec) return;
+      placeZone(key, x + (width - spec.width) / 2, cursorY);
+      cursorY += spec.height + stackGap;
+    });
+  };
+
+  const centerY = coreY + centralHeight / 2 - 45;
   central.forEach((system, index) => {
     positions[system._id] = {
       x: coreX + 34,
@@ -1255,8 +1288,8 @@ function layoutNodes(
     height: centralHeight,
     accent: "#a78bfa",
   });
-  placeZone("pilot", canvasLeft + 122, bottomRowY);
-  placeZone("legacy", coreX + 150, bottomRowY);
+  placeStack(["platform", "pilot"], leftX, bottomRowY, leftWidth);
+  placeStack(["automation", "legacy"], rightX, bottomRowY, rightWidth);
 
   return {
     positions,
