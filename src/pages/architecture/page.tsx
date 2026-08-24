@@ -812,8 +812,6 @@ type EcosystemGroupConfig = {
   title: string;
   subtitle: string;
   accent: string;
-  x: number;
-  y: number;
 };
 
 const ECOSYSTEM_GROUPS: Record<EcosystemGroupKey, EcosystemGroupConfig> = {
@@ -821,43 +819,31 @@ const ECOSYSTEM_GROUPS: Record<EcosystemGroupKey, EcosystemGroupConfig> = {
     title: "Vận hành & Workspace",
     subtitle: "ERP, CRM, HR, tài chính, cổng nội bộ và công cụ tác nghiệp",
     accent: "#22c55e",
-    x: 35,
-    y: 46,
   },
   learning: {
     title: "Học thuật & Trải nghiệm",
     subtitle: "SIS, LMS, tuyển sinh, phụ huynh, học sinh và dịch vụ trường",
     accent: "#38bdf8",
-    x: 910,
-    y: 46,
   },
   automation: {
     title: "Tích hợp & Tự động hoá",
     subtitle: "API, workflow, event, đồng bộ dữ liệu và tác vụ tự động",
     accent: "#f97316",
-    x: 930,
-    y: 330,
   },
   platform: {
     title: "Dữ liệu & Nền tảng",
     subtitle: "BI, data, identity, cloud, database và hạ tầng dùng chung",
     accent: "#8b5cf6",
-    x: 10,
-    y: 330,
   },
   pilot: {
     title: "Pilot / thử nghiệm",
     subtitle: "Sáng kiến đang kiểm chứng trước khi đưa vào lõi vận hành",
     accent: "#3b82f6",
-    x: 155,
-    y: 625,
   },
   legacy: {
     title: "Legacy / chuyển đổi",
     subtitle: "Hệ thống nợ kỹ thuật, sunset hoặc cần tách khỏi lõi",
     accent: "#f59e0b",
-    x: 770,
-    y: 625,
   },
 };
 
@@ -918,6 +904,17 @@ function placeGrid(
       y: y + 68 + row * (nodeH + gapY),
     };
   });
+}
+
+function zoneSizeFor(count: number) {
+  const columns = count > 3 ? 2 : 1;
+  const rows = Math.ceil(count / columns);
+  return {
+    columns,
+    rows,
+    width: columns === 2 ? 438 : 242,
+    height: Math.max(228, 82 + rows * 148 + (rows - 1) * 22 + 28),
+  };
 }
 
 function buildIntegrationMetrics(integrations: Integration[]) {
@@ -1096,16 +1093,6 @@ function layoutNodes(
   const central = sorted.filter((system) => centralIds.has(system._id));
   const satellites = sorted.filter((system) => !centralIds.has(system._id));
 
-  const centerX = 590;
-  const centerY = 350;
-  const centralGap = 164;
-  central.forEach((system, index) => {
-    positions[system._id] = {
-      x: centerX,
-      y: centerY - ((central.length - 1) * centralGap) / 2 + index * centralGap,
-    };
-  });
-
   const groups = new globalThis.Map<EcosystemGroupKey, System[]>();
   (Object.keys(ECOSYSTEM_GROUPS) as EcosystemGroupKey[]).forEach((key) => {
     groups.set(key, []);
@@ -1115,40 +1102,103 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
+  const rowGap = 56;
+  const colGap = 70;
+  const canvasLeft = 24;
+  const topY = 44;
+  const coreWidth = 288;
+  const centralGap = 164;
+  const centralHeight = Math.max(252, 86 + central.length * centralGap);
+  const zoneSpecs = new globalThis.Map<
+    EcosystemGroupKey,
+    {
+      items: System[];
+      config: EcosystemGroupConfig;
+      columns: number;
+      width: number;
+      height: number;
+    }
+  >();
+
   groups.forEach((items, key) => {
     if (!items.length) return;
     const config = ECOSYSTEM_GROUPS[key];
-    const columns = items.length > 3 ? 2 : 1;
-    const rows = Math.ceil(items.length / columns);
-    const width = columns === 2 ? 438 : 242;
-    const height = Math.max(228, 82 + rows * 148 + (rows - 1) * 22 + 28);
-    const issueCount = items.filter((system) =>
+    const size = zoneSizeFor(items.length);
+    zoneSpecs.set(key, {
+      items,
+      config,
+      columns: size.columns,
+      width: size.width,
+      height: size.height,
+    });
+  });
+
+  const zoneHeight = (key: EcosystemGroupKey) =>
+    zoneSpecs.get(key)?.height ?? 0;
+  const topRowHeight = Math.max(
+    zoneHeight("workspace"),
+    zoneHeight("learning"),
+    0,
+  );
+  const middleRowHeight = Math.max(
+    zoneHeight("platform"),
+    centralHeight,
+    zoneHeight("automation"),
+  );
+  const topRowY = topY;
+  const middleRowY = topRowY + (topRowHeight || 0) + rowGap;
+  const bottomRowY = middleRowY + middleRowHeight + rowGap;
+  const coreX = canvasLeft + 500;
+
+  const placeZone = (key: EcosystemGroupKey, x: number, y: number) => {
+    const spec = zoneSpecs.get(key);
+    if (!spec) return;
+    const issueCount = spec.items.filter((system) =>
       ["degraded", "down"].includes(
         metrics.get(system._id)?.worstHealth ?? "unknown",
       ),
     ).length;
-    const highDebtCount = items.filter(
+    const highDebtCount = spec.items.filter(
       (system) => system.technicalDebtScore >= 70,
     ).length;
     const statusNotes = [
-      `${items.length} hệ thống`,
+      `${spec.items.length} hệ thống`,
       issueCount ? `${issueCount} cần chú ý` : null,
       highDebtCount ? `${highDebtCount} nợ kỹ thuật cao` : null,
     ].filter(Boolean);
-    placeGrid(items, config.x, config.y, columns, positions);
+    placeGrid(spec.items, x, y, spec.columns, positions);
     zones.push({
       id: `zone-${key}`,
-      title: config.title,
-      subtitle: `${statusNotes.join(" · ")} · ${config.subtitle}`,
-      x: config.x,
-      y: config.y,
-      width,
-      height,
-      accent: config.accent,
+      title: spec.config.title,
+      subtitle: `${statusNotes.join(" · ")} · ${spec.config.subtitle}`,
+      x,
+      y,
+      width: spec.width,
+      height: spec.height,
+      accent: spec.config.accent,
     });
-  });
+  };
 
-  const centralHeight = Math.max(252, 86 + central.length * centralGap);
+  placeZone("workspace", canvasLeft + 10, topRowY);
+  placeZone("learning", coreX + coreWidth + colGap, topRowY);
+  placeZone(
+    "platform",
+    canvasLeft + 10,
+    middleRowY + (middleRowHeight - zoneHeight("platform")) / 2,
+  );
+  placeZone(
+    "automation",
+    coreX + coreWidth + colGap,
+    middleRowY + (middleRowHeight - zoneHeight("automation")) / 2,
+  );
+
+  const centerY = middleRowY + middleRowHeight / 2;
+  central.forEach((system, index) => {
+    positions[system._id] = {
+      x: coreX + 34,
+      y: centerY - ((central.length - 1) * centralGap) / 2 + index * centralGap,
+    };
+  });
   zones.push({
     id: "zone-core",
     title: "Trung tâm kiến trúc",
@@ -1156,12 +1206,14 @@ function layoutNodes(
       central.length === 1
         ? "Hub chính được chọn theo số kết nối, loại core và mức trọng yếu"
         : `${central.length} hub chính được chọn theo số kết nối, loại core và mức trọng yếu`,
-    x: centerX - 34,
+    x: coreX,
     y: centerY - centralHeight / 2 + 45,
-    width: 288,
+    width: coreWidth,
     height: centralHeight,
     accent: "#a78bfa",
   });
+  placeZone("pilot", canvasLeft + 150, bottomRowY);
+  placeZone("legacy", coreX + 180, bottomRowY);
 
   return {
     positions,
