@@ -246,6 +246,7 @@ interface ZoneNodeData {
   subtitle: string;
   accent: string;
   isCore: boolean;
+  isPlaceholder: boolean;
 }
 
 type ArchitectureNodeData = NodeData | ZoneNodeData;
@@ -663,7 +664,7 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
-          padding: 28,
+          padding: 24,
           position: "relative",
           overflow: "hidden",
         }}
@@ -699,11 +700,19 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
             boxShadow: "0 0 42px rgba(34, 211, 238, 0.25)",
           }}
         />
-        <div style={{ position: "relative", zIndex: 1 }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 30,
+            left: 28,
+            right: 28,
+            zIndex: 1,
+          }}
+        >
           <div
             style={{
               color: "#e0f2fe",
-              fontSize: 18,
+              fontSize: 17,
               fontWeight: 900,
               lineHeight: 1.15,
               letterSpacing: 0.5,
@@ -713,13 +722,21 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           >
             {data.title}
           </div>
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: 28,
+            left: 40,
+            right: 40,
+            zIndex: 1,
+          }}
+        >
           <div
             style={{
-              marginTop: 8,
               color: "#c4b5fd",
               fontSize: 10,
               lineHeight: 1.35,
-              maxWidth: 220,
             }}
           >
             {data.subtitle}
@@ -736,8 +753,12 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         height: "100%",
         border: `1px solid ${data.accent}66`,
         borderRadius: 24,
-        background: `linear-gradient(135deg, ${data.accent}16 0%, #071426d9 42%, #050b18e8 100%)`,
-        boxShadow: `inset 0 0 38px ${data.accent}12, 0 0 20px ${data.accent}10`,
+        background: data.isPlaceholder
+          ? `linear-gradient(135deg, ${data.accent}0d 0%, #07142699 42%, #050b18aa 100%)`
+          : `linear-gradient(135deg, ${data.accent}16 0%, #071426d9 42%, #050b18e8 100%)`,
+        boxShadow: data.isPlaceholder
+          ? `inset 0 0 24px ${data.accent}0d`
+          : `inset 0 0 38px ${data.accent}12, 0 0 20px ${data.accent}10`,
         pointerEvents: "none",
         overflow: "hidden",
         position: "relative",
@@ -746,8 +767,8 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
       <div
         style={{
           padding: "16px 18px 8px",
-          color: "#f8fafc",
-          fontSize: 16,
+          color: data.isPlaceholder ? "#94a3b8" : "#f8fafc",
+          fontSize: 15,
           fontWeight: 900,
           letterSpacing: 0.4,
           textTransform: "uppercase",
@@ -779,6 +800,20 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           opacity: 0.75,
         }}
       />
+      {data.isPlaceholder && (
+        <div
+          style={{
+            position: "absolute",
+            inset: "auto 18px 18px 18px",
+            color: data.accent,
+            fontSize: 10,
+            fontWeight: 700,
+            opacity: 0.8,
+          }}
+        >
+          Chưa có hệ thống trong cụm này
+        </div>
+      )}
     </div>
   );
 }
@@ -929,6 +964,7 @@ type ArchitectureZone = {
   width: number;
   height: number;
   accent: string;
+  isPlaceholder?: boolean;
 };
 
 type ArchitectureLayout = {
@@ -1256,9 +1292,9 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const rowGap = 24;
-  const stackGap = 18;
-  const colGap = 22;
+  const rowGap = 18;
+  const stackGap = 14;
+  const colGap = 16;
   const canvasLeft = 8;
   const topY = 28;
   const coreWidth = 360;
@@ -1272,19 +1308,23 @@ function layoutNodes(
       columns: number;
       width: number;
       height: number;
+      isPlaceholder: boolean;
     }
   >();
 
   groups.forEach((items, key) => {
-    if (!items.length) return;
     const config = ECOSYSTEM_GROUPS[key];
-    const size = zoneSizeFor(items.length);
+    const isPlaceholder = items.length === 0;
+    const size = isPlaceholder
+      ? { columns: 1, rows: 1, width: 232, height: 170 }
+      : zoneSizeFor(items.length);
     zoneSpecs.set(key, {
       items,
       config,
       columns: size.columns,
       width: size.width,
       height: size.height,
+      isPlaceholder,
     });
   });
 
@@ -1320,11 +1360,13 @@ function layoutNodes(
       (system) => system.technicalDebtScore >= 70,
     ).length;
     const statusNotes = [
-      `${spec.items.length} hệ thống`,
+      spec.isPlaceholder ? "Chưa có hệ thống" : `${spec.items.length} hệ thống`,
       issueCount ? `${issueCount} cần chú ý` : null,
       highDebtCount ? `${highDebtCount} nợ kỹ thuật cao` : null,
     ].filter(Boolean);
-    placeGrid(spec.items, x, y, spec.columns, positions);
+    if (!spec.isPlaceholder) {
+      placeGrid(spec.items, x, y, spec.columns, positions);
+    }
     zones.push({
       id: `zone-${key}`,
       title: spec.config.title,
@@ -1334,6 +1376,7 @@ function layoutNodes(
       width: spec.width,
       height: spec.height,
       accent: spec.config.accent,
+      isPlaceholder: spec.isPlaceholder,
     });
   };
 
@@ -3474,6 +3517,7 @@ function ArchitectureContent() {
             subtitle: zone.subtitle,
             accent: zone.accent,
             isCore: zone.id === "zone-core",
+            isPlaceholder: Boolean(zone.isPlaceholder),
           },
           draggable: false,
           selectable: false,
@@ -3618,6 +3662,12 @@ function ArchitectureContent() {
           (targetInZone &&
             architectureLayout.centralIds.has(intg.sourceSystemId));
         const isZoneEdge = sourceInZone || targetInZone || isZoneToHubEdge;
+        const isDefaultOverview =
+          !selectedId &&
+          !selectedIntegrationId &&
+          !selectedZoneKey &&
+          mapMode === "ecosystem" &&
+          edgeFocus === "all";
         const edgeOpacity = isHiddenEdge
           ? 0.025
           : selectedId || selectedIntegrationId
@@ -3631,7 +3681,9 @@ function ArchitectureContent() {
               : isFiltered && matchesMapMode
                 ? mapMode === "risk" && !isRiskEdge
                   ? 0.22
-                  : 0.9
+                  : isDefaultOverview && !isRiskEdge
+                    ? 0.28
+                    : 0.9
                 : mapMode === "risk"
                   ? 0.08
                   : 0.1;
@@ -3646,9 +3698,7 @@ function ArchitectureContent() {
               ? `${intg.protocol} · ${
                   METHOD_META[intg.method]?.label ?? intg.method
                 }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
-              : intg.criticalLevel === "high" ||
-                  edgeFocus !== "all" ||
-                  (mapMode === "risk" && isRiskEdge)
+              : edgeFocus !== "all" || (mapMode === "risk" && isRiskEdge)
                 ? (METHOD_META[intg.method]?.label ?? intg.method)
                 : undefined,
           data: { isHighCritical: intg.criticalLevel === "high" },
