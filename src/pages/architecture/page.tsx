@@ -349,8 +349,7 @@ const zoomSelector = (state: { transform: [number, number, number] }) =>
 const COMPACT_ZOOM_THRESHOLD = 0.35;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
-  const zoom = useStore(zoomSelector);
-  const isCompact = zoom < COMPACT_ZOOM_THRESHOLD;
+  const isCompact = true;
   const {
     system: s,
     inCount,
@@ -367,6 +366,8 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   const statusMeta = STATUS_META[s.status] ?? STATUS_META.inactive;
   const healthColor = HEALTH_META[worstHealth]?.color ?? "#6b7280";
   const Icon = systemIconFor(s);
+  const nodeWidth = isCentral ? 172 : 146;
+  const iconSize = isCentral ? 22 : 20;
   const nodeBorder = isRiskMode ? riskColor : meta.border;
   const nodeBg = isRiskMode
     ? riskTone === "high"
@@ -382,7 +383,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
       style={{
         background: nodeBg,
         borderRadius: 10,
-        width: isCentral ? 220 : 176,
+        width: nodeWidth,
         cursor: "pointer",
         border: `${isSelected ? "2.5px" : "1.5px"} solid ${isSelected ? "#fff" : nodeBorder}`,
         boxShadow: isSelected
@@ -428,7 +429,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           // gánh quá nhiều nghĩa"). Neutralize it so risk color dominates.
           background: isRiskMode ? "#1e293b" : meta.badge,
           borderRadius: "8px 8px 0 0",
-          padding: "3px 10px",
+          padding: "3px 8px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -437,7 +438,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         <span
           style={{
             color: "#fff",
-            fontSize: 9,
+            fontSize: 8,
             fontWeight: 700,
             letterSpacing: 0.5,
             textTransform: "uppercase",
@@ -445,7 +446,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         >
           {meta.label}
         </span>
-        <span style={{ color: "#fff", fontSize: 10, opacity: 0.9 }}>
+        <span style={{ color: "#fff", fontSize: 9, opacity: 0.9 }}>
           {isCentral ? (
             <span
               style={{
@@ -485,12 +486,12 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           {s.status}
         </span>
       </div>
-      <div style={{ padding: "8px 10px" }}>
-        <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
+      <div style={{ padding: "7px 8px" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
           <div
             style={{
-              width: isCentral ? 28 : 24,
-              height: isCentral ? 28 : 24,
+              width: iconSize,
+              height: iconSize,
               borderRadius: 8,
               display: "flex",
               alignItems: "center",
@@ -501,16 +502,16 @@ function SystemNode({ data }: NodeProps<NodeData>) {
               flexShrink: 0,
             }}
           >
-            <Icon size={isCentral ? 15 : 13} />
+            <Icon size={isCentral ? 13 : 12} />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div
               style={{
                 color: meta.text,
                 fontWeight: 700,
-                fontSize: isCentral ? 13 : 11,
+                fontSize: isCentral ? 11 : 10,
                 lineHeight: 1.25,
-                marginBottom: 2,
+                marginBottom: 1,
               }}
             >
               {s.name}
@@ -518,9 +519,9 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             <div
               style={{
                 color: meta.text,
-                fontSize: 9,
+                fontSize: 8,
                 opacity: 0.6,
-                marginBottom: 7,
+                marginBottom: 5,
               }}
             >
               {s.category}
@@ -623,7 +624,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             display: "flex",
             justifyContent: "space-between",
             borderTop: "1px solid #1e293b",
-            paddingTop: 5,
+            paddingTop: 4,
           }}
         >
           <span style={{ fontSize: 8, color: "#64748b" }}>← {inCount} in</span>
@@ -1074,16 +1075,16 @@ function placeGrid(
   columns: number,
   positions: Record<string, { x: number; y: number }>,
 ) {
-  const nodeW = 176;
-  const nodeH = 148;
-  const gapX = 16;
-  const gapY = 16;
+  const nodeW = 146;
+  const nodeH = 86;
+  const gapX = 12;
+  const gapY = 12;
   items.forEach((system, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
     positions[system._id] = {
-      x: x + 22 + col * (nodeW + gapX),
-      y: y + 64 + row * (nodeH + gapY),
+      x: x + 16 + col * (nodeW + gapX),
+      y: y + 56 + row * (nodeH + gapY),
     };
   });
 }
@@ -1103,12 +1104,12 @@ function zoneSizeFor(count: number) {
   const columns = count <= 3 ? 1 : Math.min(3, Math.ceil(Math.sqrt(count)));
   const rows = Math.ceil(count / columns);
   const width =
-    columns === 1 ? 232 : 22 + columns * 176 + (columns - 1) * 16 + 30;
+    columns === 1 ? 184 : 16 + columns * 146 + (columns - 1) * 12 + 24;
   return {
     columns,
     rows,
     width,
-    height: Math.max(218, 78 + rows * 148 + (rows - 1) * 16 + 24),
+    height: Math.max(150, 64 + rows * 86 + (rows - 1) * 12 + 18),
   };
 }
 
@@ -1302,9 +1303,9 @@ function layoutNodes(
   const colGap = 10;
   const canvasLeft = 8;
   const topY = 28;
-  const coreWidth = 360;
-  const centralGap = 164;
-  const centralHeight = Math.max(360, 96 + central.length * centralGap);
+  const coreWidth = 300;
+  const centralGap = 104;
+  const centralHeight = Math.max(300, 86 + central.length * centralGap);
   const zoneSpecs = new globalThis.Map<
     EcosystemGroupKey,
     {
@@ -1321,7 +1322,7 @@ function layoutNodes(
     const config = ECOSYSTEM_GROUPS[key];
     const isPlaceholder = items.length === 0;
     const size = isPlaceholder
-      ? { columns: 1, rows: 1, width: 206, height: 104 }
+      ? { columns: 1, rows: 1, width: 164, height: 84 }
       : zoneSizeFor(items.length);
     zoneSpecs.set(key, {
       items,
@@ -1337,7 +1338,7 @@ function layoutNodes(
     zoneSpecs.get(key)?.height ?? 0;
   const zoneWidth = (key: EcosystemGroupKey) => zoneSpecs.get(key)?.width ?? 0;
   const maxZoneWidth = (keys: EcosystemGroupKey[]) =>
-    Math.max(...keys.map((key) => zoneWidth(key)), 232);
+    Math.max(...keys.map((key) => zoneWidth(key)), 184);
 
   const topRowHeight = Math.max(
     zoneHeight("workspace"),
@@ -1417,7 +1418,7 @@ function layoutNodes(
   const centerY = coreY + centralHeight / 2 - 45;
   central.forEach((system, index) => {
     positions[system._id] = {
-      x: coreX + (coreWidth - 220) / 2,
+      x: coreX + (coreWidth - 172) / 2,
       y: centerY - ((central.length - 1) * centralGap) / 2 + index * centralGap,
     };
   });
