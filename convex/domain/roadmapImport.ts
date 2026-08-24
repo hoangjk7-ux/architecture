@@ -142,9 +142,8 @@ function formatTaskLine(row: ImportRow): string {
 export function buildSprintImportTree(rows: ImportRow[]): SprintImport[] {
   const sprints: SprintImport[] = [];
   let currentSprint: SprintImport | null = null;
-  let currentWorkstream:
-    | (WorkstreamImport & { _lines: string[] })
-    | null = null;
+  let currentWorkstream: (WorkstreamImport & { _lines: string[] }) | null =
+    null;
 
   const flushWorkstream = () => {
     if (currentWorkstream && currentSprint) {

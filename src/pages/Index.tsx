@@ -116,7 +116,9 @@ export default function Index() {
               <Skeleton className="h-6 w-24" />
             ) : (
               <Badge
-                variant={progressStatus === "danger" ? "destructive" : "secondary"}
+                variant={
+                  progressStatus === "danger" ? "destructive" : "secondary"
+                }
                 className="shrink-0"
               >
                 {progressStatusLabel}
@@ -134,9 +136,7 @@ export default function Index() {
             <>
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <div className="text-3xl font-bold">
-                    {projectProgress}%
-                  </div>
+                  <div className="text-3xl font-bold">{projectProgress}%</div>
                   <div className="text-xs text-muted-foreground">
                     {t("dashboard.overallCompletion")}
                   </div>

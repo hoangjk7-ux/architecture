@@ -21,11 +21,19 @@ import {
 } from "@/components/ui/select.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
-import { Plus, ShieldCheck, Edit, Trash2, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  ShieldCheck,
+  Edit,
+  Trash2,
+  ChevronRight,
+  FileSpreadsheet,
+} from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user.ts";
 import { cn } from "@/lib/utils.ts";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
+import { ImportSprintsDialog } from "./_components/ImportSprintsDialog.tsx";
 
 type RoadmapItem = Doc<"roadmap_items">;
 
@@ -59,6 +67,20 @@ const levelOrder = [
 ] as const;
 
 type RoadmapLevel = (typeof levelOrder)[number];
+
+// "sprint" is a sibling of "epic" (both attach under "project"), so the
+// naive levelOrder[index - 1] trick that works for the strictly linear
+// initiative -> program -> project -> epic chain doesn't hold once sprint
+// branches off it. Mirrors requiredParentLevel in
+// convex/domain/roadmap.ts.
+const parentLevelOf: Record<RoadmapLevel, RoadmapLevel | null> = {
+  initiative: null,
+  program: "initiative",
+  project: "program",
+  epic: "project",
+  sprint: "project",
+  workstream: "sprint",
+};
 type RoadmapStatus =
   | "not_started"
   | "in_progress"
@@ -122,11 +144,9 @@ function RoadmapForm({
     v: (typeof defaultForm)[K],
   ) => setForm((f) => ({ ...f, [k]: v }));
 
-  const parentCandidates = items.filter((i) => {
-    const levelIdx = levelOrder.indexOf(form.level);
-    const parentLevel = levelOrder[levelIdx - 1];
-    return i.level === parentLevel;
-  });
+  const parentCandidates = items.filter(
+    (i) => i.level === parentLevelOf[form.level],
+  );
 
   const handleSave = async () => {
     if (!form.title.trim()) {
@@ -314,6 +334,7 @@ function RoadmapContent() {
   const removeItem = useMutation(api.roadmap.remove);
 
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editing, setEditing] = useState<RoadmapItem | null>(null);
   const [filterLevel, setFilterLevel] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -328,6 +349,8 @@ function RoadmapContent() {
   const initiatives = filtered.filter((i) => i.level === "initiative");
   const programs = filtered.filter((i) => i.level === "program");
   const projects = filtered.filter((i) => i.level === "project");
+  const sprints = filtered.filter((i) => i.level === "sprint");
+  const workstreams = filtered.filter((i) => i.level === "workstream");
 
   const handleCreate = async (data: RoadmapFormData) => {
     await createItem(data);
@@ -442,10 +465,25 @@ function RoadmapContent() {
           </p>
         </div>
         {canWrite && (
-          <Button onClick={() => setShowForm(true)} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Item
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowImport(true)}
+              size="sm"
+              variant="outline"
+              className="gap-2"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Nhập Sprint từ Excel
+            </Button>
+            <Button
+              onClick={() => setShowForm(true)}
+              size="sm"
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Item
+            </Button>
+          </div>
         )}
       </div>
 
@@ -540,7 +578,21 @@ function RoadmapContent() {
                         {renderItem(prog, 1)}
                         {projects
                           .filter((p) => p.parentId === prog._id)
-                          .map((proj) => renderItem(proj, 2))}
+                          .map((proj) => (
+                            <div key={proj._id}>
+                              {renderItem(proj, 2)}
+                              {sprints
+                                .filter((s) => s.parentId === proj._id)
+                                .map((sprint) => (
+                                  <div key={sprint._id}>
+                                    {renderItem(sprint, 3)}
+                                    {workstreams
+                                      .filter((w) => w.parentId === sprint._id)
+                                      .map((ws) => renderItem(ws, 4))}
+                                  </div>
+                                ))}
+                            </div>
+                          ))}
                       </div>
                     ))}
                 </div>
@@ -577,6 +629,17 @@ function RoadmapContent() {
               items={items}
             />
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showImport} onOpenChange={setShowImport}>
+        <DialogContent className="max-w-lg bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Nhập Sprint từ Excel</DialogTitle>
+          </DialogHeader>
+          <ImportSprintsDialog
+            items={items}
+            onClose={() => setShowImport(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

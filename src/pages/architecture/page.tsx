@@ -1999,9 +1999,7 @@ function DetailPanel({
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
-                  <h3 className="text-xs font-semibold">
-                    Khuyến nghị xử lý
-                  </h3>
+                  <h3 className="text-xs font-semibold">Khuyến nghị xử lý</h3>
                 </div>
                 <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
                   {riskRecommendations.length} mục

@@ -31,6 +31,7 @@ describe("parseImportDate", () => {
   it("returns undefined for blank, malformed or non-calendar dates", () => {
     expect(parseImportDate(undefined)).toBeUndefined();
     expect(parseImportDate("")).toBeUndefined();
+    expect(parseImportDate("   ")).toBeUndefined(); // whitespace-only
     expect(parseImportDate("not-a-date")).toBeUndefined();
     expect(parseImportDate("32/13/26")).toBeUndefined();
     expect(parseImportDate("2026-05-12")).toBeUndefined(); // wrong shape
@@ -60,7 +61,15 @@ describe("classifyWbs", () => {
 // and a trailing legend row that must stop parsing.
 const sampleGrid: unknown[][] = [
   ["", "", "", "", "", "", ""],
-  ["Ngày bắt đầu:", "", "", "12/05/2026", "Ngày kết thúc:", "20/06/2026", "PM: A"],
+  [
+    "Ngày bắt đầu:",
+    "",
+    "",
+    "12/05/2026",
+    "Ngày kết thúc:",
+    "20/06/2026",
+    "PM: A",
+  ],
   ["", "", "", "", "", "", ""],
   [
     "WBS",
@@ -71,13 +80,69 @@ const sampleGrid: unknown[][] = [
     "Số Ngày",
     "Trạng Thái",
   ],
-  ["Sprint 1", "PHÂN TÍCH YÊU CẦU", "", "12/05/26", "19/05/26", "5", "Hoàn thành"],
-  ["1", "Luồng 1: Quản Lý Tạo Đơn Hàng", "", "12/05/26", "19/05/26", "5", "Hoàn thành"],
-  ["1.1", "Thu thập & phân tích yêu cầu", "Bình", "12/05/26", "12/05/26", "0", "Hoàn thành"],
-  ["1.2", "Thiết kế UI", "Hoa, Bình", "13/05/26", "14/05/26", "1", "Hoàn thành"],
-  ["Sprint 2", "PHÁT TRIỂN NGHIỆP VỤ", "", "20/05/26", "27/05/26", "5", "Đang thực hiện"],
-  ["2", "Luồng 2: Xử lý thanh toán", "", "20/05/26", "24/05/26", "2", "Chưa làm"],
-  ["2.1", "Phát triển xử lý thanh toán", "Quang", "20/05/26", "22/05/26", "2", "Chưa làm"],
+  [
+    "Sprint 1",
+    "PHÂN TÍCH YÊU CẦU",
+    "",
+    "12/05/26",
+    "19/05/26",
+    "5",
+    "Hoàn thành",
+  ],
+  [
+    "1",
+    "Luồng 1: Quản Lý Tạo Đơn Hàng",
+    "",
+    "12/05/26",
+    "19/05/26",
+    "5",
+    "Hoàn thành",
+  ],
+  [
+    "1.1",
+    "Thu thập & phân tích yêu cầu",
+    "Bình",
+    "12/05/26",
+    "12/05/26",
+    "0",
+    "Hoàn thành",
+  ],
+  [
+    "1.2",
+    "Thiết kế UI",
+    "Hoa, Bình",
+    "13/05/26",
+    "14/05/26",
+    "1",
+    "Hoàn thành",
+  ],
+  [
+    "Sprint 2",
+    "PHÁT TRIỂN NGHIỆP VỤ",
+    "",
+    "20/05/26",
+    "27/05/26",
+    "5",
+    "Đang thực hiện",
+  ],
+  [
+    "2",
+    "Luồng 2: Xử lý thanh toán",
+    "",
+    "20/05/26",
+    "24/05/26",
+    "2",
+    "Chưa làm",
+  ],
+  [
+    "2.1",
+    "Phát triển xử lý thanh toán",
+    "Quang",
+    "20/05/26",
+    "22/05/26",
+    "2",
+    "Chưa làm",
+  ],
   ["", "", "", "", "", "", ""],
   ["CHÚ GIẢI:", " ", "Hoàn thành", " ", "Đang thực hiện", " ", "Chưa làm"],
   ["3", "Luồng sau chú giải — không được đọc", "", "", "", "", ""],
@@ -99,7 +164,39 @@ describe("extractImportRows", () => {
   });
 
   it("returns an empty array when no WBS header row exists", () => {
-    expect(extractImportRows([["a", "b"], ["c", "d"]])).toEqual([]);
+    expect(
+      extractImportRows([
+        ["a", "b"],
+        ["c", "d"],
+      ]),
+    ).toEqual([]);
+  });
+
+  it("normalizes missing trailing columns and sparse rows to empty strings", () => {
+    const rows = extractImportRows([
+      ["WBS", "Tên Nhiệm Vụ", "", "", "", "", "Trạng Thái"],
+      ["1.1", "Task thiếu cột"], // owner/dates/status columns absent entirely
+      undefined as unknown as string[], // a hole in the grid
+      ["1.2", "Task sau hole", "Ai đó", "", "", "", ""],
+    ]);
+    expect(rows).toEqual([
+      {
+        wbs: "1.1",
+        title: "Task thiếu cột",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+      {
+        wbs: "1.2",
+        title: "Task sau hole",
+        owner: "Ai đó",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+    ]);
   });
 });
 
@@ -141,5 +238,80 @@ describe("buildSprintImportTree / parseSprintTimelineSheet", () => {
 
   it("returns an empty array for an empty/header-less grid", () => {
     expect(parseSprintTimelineSheet([])).toEqual([]);
+  });
+
+  it("leaves description undefined for a workstream with no task rows", () => {
+    const [sprint] = buildSprintImportTree([
+      {
+        wbs: "Sprint 1",
+        title: "S1",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+      {
+        wbs: "1",
+        title: "Luồng rỗng",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+    ]);
+    expect(sprint.workstreams[0].description).toBeUndefined();
+  });
+
+  it("formats a task line with no owner/dates/status as a bare label", () => {
+    const [sprint] = buildSprintImportTree([
+      {
+        wbs: "Sprint 1",
+        title: "S1",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+      {
+        wbs: "1",
+        title: "Luồng",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+      {
+        wbs: "1.1",
+        title: "Task trần trụi",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+    ]);
+    expect(sprint.workstreams[0].description).toBe("• 1.1 Task trần trụi");
+  });
+
+  it("ignores an unclassifiable WBS row instead of crashing", () => {
+    const sprints = buildSprintImportTree([
+      {
+        wbs: "Sprint 1",
+        title: "S1",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+      {
+        wbs: "???",
+        title: "Dòng lạ",
+        owner: "",
+        startDate: "",
+        endDate: "",
+        status: "",
+      },
+    ]);
+    expect(sprints).toHaveLength(1);
+    expect(sprints[0].workstreams).toEqual([]);
   });
 });
