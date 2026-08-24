@@ -901,14 +901,14 @@ function placeGrid(
 ) {
   const nodeW = 176;
   const nodeH = 148;
-  const gapX = 22;
-  const gapY = 22;
+  const gapX = 16;
+  const gapY = 16;
   items.forEach((system, index) => {
     const col = index % columns;
     const row = Math.floor(index / columns);
     positions[system._id] = {
-      x: x + 26 + col * (nodeW + gapX),
-      y: y + 68 + row * (nodeH + gapY),
+      x: x + 22 + col * (nodeW + gapX),
+      y: y + 64 + row * (nodeH + gapY),
     };
   });
 }
@@ -919,8 +919,8 @@ function zoneSizeFor(count: number) {
   return {
     columns,
     rows,
-    width: columns === 2 ? 438 : 242,
-    height: Math.max(228, 82 + rows * 148 + (rows - 1) * 22 + 28),
+    width: columns === 2 ? 416 : 232,
+    height: Math.max(218, 78 + rows * 148 + (rows - 1) * 16 + 24),
   };
 }
 
@@ -1109,10 +1109,10 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const rowGap = 56;
-  const colGap = 70;
-  const canvasLeft = 24;
-  const topY = 44;
+  const rowGap = 36;
+  const colGap = 44;
+  const canvasLeft = 8;
+  const topY = 28;
   const coreWidth = 288;
   const centralGap = 164;
   const centralHeight = Math.max(252, 86 + central.length * centralGap);
@@ -1155,7 +1155,7 @@ function layoutNodes(
   const topRowY = topY;
   const middleRowY = topRowY + (topRowHeight || 0) + rowGap;
   const bottomRowY = middleRowY + middleRowHeight + rowGap;
-  const coreX = canvasLeft + 500;
+  const coreX = canvasLeft + 442;
 
   const placeZone = (key: EcosystemGroupKey, x: number, y: number) => {
     const spec = zoneSpecs.get(key);
@@ -1219,8 +1219,8 @@ function layoutNodes(
     height: centralHeight,
     accent: "#a78bfa",
   });
-  placeZone("pilot", canvasLeft + 150, bottomRowY);
-  placeZone("legacy", coreX + 180, bottomRowY);
+  placeZone("pilot", canvasLeft + 122, bottomRowY);
+  placeZone("legacy", coreX + 150, bottomRowY);
 
   return {
     positions,
@@ -3703,7 +3703,9 @@ function ArchitectureContent() {
                   nodeTypes={nodeTypes}
                   edgeTypes={edgeTypes}
                   fitView
-                  fitViewOptions={{ padding: 0.15 }}
+                  fitViewOptions={{ padding: 0.06 }}
+                  minZoom={0.08}
+                  maxZoom={1.8}
                   attributionPosition="bottom-right"
                   proOptions={{ hideAttribution: true }}
                   onNodeClick={(_evt, node) => {
