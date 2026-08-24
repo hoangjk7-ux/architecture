@@ -71,6 +71,24 @@ export default function Index() {
   const vendors = useQuery(api.vendors.list);
 
   const highRiskVendors = vendors?.filter((v) => v.riskScore >= 70).length;
+  const projectProgress =
+    roadmapStats?.completionRate !== undefined
+      ? roadmapStats.completionRate
+      : undefined;
+  const progressStatus =
+    roadmapStats?.blocked || roadmapStats?.overdue
+      ? "danger"
+      : projectProgress !== undefined && projectProgress >= 70
+        ? "success"
+        : projectProgress !== undefined && projectProgress >= 35
+          ? "warning"
+          : "default";
+  const progressStatusLabel =
+    progressStatus === "danger"
+      ? t("dashboard.atRisk")
+      : progressStatus === "success"
+        ? t("dashboard.onTrack")
+        : t("dashboard.needsAttention");
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -82,6 +100,92 @@ export default function Index() {
           {t("dashboard.subtitle")}
         </p>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-base">
+                {t("dashboard.projectProgress")}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t("dashboard.projectProgressSubtitle")}
+              </p>
+            </div>
+            {projectProgress === undefined ? (
+              <Skeleton className="h-6 w-24" />
+            ) : (
+              <Badge
+                variant={progressStatus === "danger" ? "destructive" : "secondary"}
+                className="shrink-0"
+              >
+                {progressStatusLabel}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {projectProgress === undefined ? (
+            <>
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-3 w-full" />
+            </>
+          ) : (
+            <>
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <div className="text-3xl font-bold">
+                    {projectProgress}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {t("dashboard.overallCompletion")}
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-right text-xs">
+                  <div>
+                    <div className="font-semibold text-green-600">
+                      {roadmapStats?.done ?? 0}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {t("dashboard.doneItems")}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-red-600">
+                      {roadmapStats?.blocked ?? 0}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {t("dashboard.blockedItems")}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-yellow-600">
+                      {roadmapStats?.overdue ?? 0}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {t("dashboard.overdueItems")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${projectProgress}%`,
+                    background:
+                      progressStatus === "danger"
+                        ? "#ef4444"
+                        : progressStatus === "success"
+                          ? "#22c55e"
+                          : "#f59e0b",
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="space-y-4">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
