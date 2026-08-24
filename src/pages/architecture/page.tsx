@@ -221,6 +221,7 @@ interface NodeData {
   worstHealth: string;
   isSelected: boolean;
   isCentral: boolean;
+  groupKey: EcosystemGroupKey;
 }
 
 interface ZoneNodeData {
@@ -712,6 +713,8 @@ type IntegrationMetrics = {
   worstHealth: string;
 };
 
+type EdgeFocus = "all" | "critical" | "issues" | "nonCompliant" | "realtime";
+
 type ArchitectureZone = {
   id: string;
   title: string;
@@ -958,11 +961,24 @@ function layoutNodes(
     const rows = Math.ceil(items.length / columns);
     const width = columns === 2 ? 438 : 242;
     const height = Math.max(228, 82 + rows * 148 + (rows - 1) * 22 + 28);
+    const issueCount = items.filter((system) =>
+      ["degraded", "down"].includes(
+        metrics.get(system._id)?.worstHealth ?? "unknown",
+      ),
+    ).length;
+    const highDebtCount = items.filter(
+      (system) => system.technicalDebtScore >= 70,
+    ).length;
+    const statusNotes = [
+      `${items.length} hệ thống`,
+      issueCount ? `${issueCount} cần chú ý` : null,
+      highDebtCount ? `${highDebtCount} nợ kỹ thuật cao` : null,
+    ].filter(Boolean);
     placeGrid(items, config.x, config.y, columns, positions);
     zones.push({
       id: `zone-${key}`,
       title: config.title,
-      subtitle: `${items.length} hệ thống · ${config.subtitle}`,
+      subtitle: `${statusNotes.join(" · ")} · ${config.subtitle}`,
       x: config.x,
       y: config.y,
       width,
@@ -2654,6 +2670,7 @@ function ArchitectureContent() {
   );
   const [filterType, setFilterType] = useState<string>("all");
   const [filterHealth, setFilterHealth] = useState<string>("all");
+  const [edgeFocus, setEdgeFocus] = useState<EdgeFocus>("all");
 
   const selectedSystem = useMemo(
     () => systems.find((s) => s._id === selectedId) ?? null,
@@ -2749,6 +2766,7 @@ function ArchitectureContent() {
           worstHealth: metrics.worstHealth,
           isSelected: selectedId === s._id,
           isCentral: architectureLayout.centralIds.has(s._id),
+          groupKey: classifyEcosystemGroup(s),
         },
         style: {
           opacity: selectedId
@@ -2775,12 +2793,26 @@ function ArchitectureContent() {
     () =>
       integrations.map((intg) => {
         const hc = HEALTH_META[intg.healthStatus] ?? HEALTH_META.unknown;
+        const matchesEdgeFocus =
+          edgeFocus === "all" ||
+          (edgeFocus === "critical" && intg.criticalLevel === "high") ||
+          (edgeFocus === "issues" &&
+            ["degraded", "down"].includes(intg.healthStatus)) ||
+          (edgeFocus === "nonCompliant" && !intg.isArchitectureCompliant) ||
+          (edgeFocus === "realtime" && intg.method === "realtime");
         const isFocused =
           selectedId === intg.sourceSystemId ||
           selectedId === intg.destinationSystemId;
         const isFiltered =
           filteredIds.has(intg.sourceSystemId) &&
           filteredIds.has(intg.destinationSystemId);
+        const edgeOpacity = selectedId
+          ? isFocused && matchesEdgeFocus
+            ? 1
+            : 0.1
+          : isFiltered && matchesEdgeFocus
+            ? 0.9
+            : 0.1;
         return {
           id: intg._id,
           source: intg.sourceSystemId,
@@ -2791,8 +2823,8 @@ function ArchitectureContent() {
               ? `${intg.protocol} · ${
                   METHOD_META[intg.method]?.label ?? intg.method
                 }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
-              : intg.criticalLevel === "high"
-                ? METHOD_META[intg.method]?.label ?? intg.method
+              : intg.criticalLevel === "high" || edgeFocus !== "all"
+                ? (METHOD_META[intg.method]?.label ?? intg.method)
                 : undefined,
           data: { isHighCritical: intg.criticalLevel === "high" },
           style: {
@@ -2804,13 +2836,7 @@ function ArchitectureContent() {
                   ? 1.8
                   : 1.2,
             strokeDasharray: !intg.isArchitectureCompliant ? "6,4" : undefined,
-            opacity: selectedId
-              ? isFocused
-                ? 1
-                : 0.15
-              : isFiltered
-                ? 0.9
-                : 0.15,
+            opacity: edgeOpacity,
           },
           animated: intg.method === "realtime",
           markerEnd: {
@@ -2821,7 +2847,7 @@ function ArchitectureContent() {
           },
         };
       }),
-    [integrations, selectedId, filteredIds],
+    [integrations, selectedId, filteredIds, edgeFocus],
   );
 
   const healthSummary = useMemo(() => {
@@ -2836,6 +2862,35 @@ function ArchitectureContent() {
     });
     return c;
   }, [integrations]);
+
+  const architectureSummary = useMemo(() => {
+    const criticalIntegrations = integrations.filter(
+      (i) => i.criticalLevel === "high",
+    ).length;
+    const issueIntegrations = integrations.filter((i) =>
+      ["degraded", "down"].includes(i.healthStatus),
+    ).length;
+    const nonCompliantIntegrations = integrations.filter(
+      (i) => !i.isArchitectureCompliant,
+    ).length;
+    const highDebtSystems = systems.filter(
+      (s) => s.technicalDebtScore >= 70,
+    ).length;
+    return {
+      hubs: architectureLayout.centralIds.size,
+      satellites: Math.max(
+        systems.length - architectureLayout.centralIds.size,
+        0,
+      ),
+      visibleSystems: filteredSystems.length,
+      criticalIntegrations,
+      issueIntegrations,
+      nonCompliantIntegrations,
+      highDebtSystems,
+      zones: architectureLayout.zones.filter((zone) => zone.id !== "zone-core")
+        .length,
+    };
+  }, [systems, integrations, architectureLayout, filteredSystems]);
 
   const handleSetViewTab = (tab: ViewTab) => {
     setViewTab(tab);
@@ -2947,6 +3002,29 @@ function ArchitectureContent() {
                 </button>
               ),
             )}
+            <div className="w-px h-5 bg-border" />
+            {(
+              [
+                ["all", "Tất cả luồng"],
+                ["critical", "Critical"],
+                ["issues", "Có lỗi"],
+                ["nonCompliant", "Sai chuẩn"],
+                ["realtime", "Realtime"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setEdgeFocus(key)}
+                className="px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
+                style={{
+                  background: edgeFocus === key ? "#f9731633" : "transparent",
+                  borderColor: edgeFocus === key ? "#f97316" : "#1e293b",
+                  color: edgeFocus === key ? "#fed7aa" : "#64748b",
+                }}
+              >
+                {label}
+              </button>
+            ))}
             {selectedId && (
               <button
                 onClick={() => setSelectedId(null)}
@@ -3063,18 +3141,19 @@ function ArchitectureContent() {
                   attributionPosition="bottom-right"
                   proOptions={{ hideAttribution: true }}
                   onNodeClick={(_evt, node) => {
+                    if (isZoneNodeId(node.id)) return;
                     setSelectedId(node.id as Id<"software_systems">);
                   }}
                   onPaneClick={() => setSelectedId(null)}
                 >
-                  <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700/80 bg-slate-950/85 px-3 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
+                  <div className="absolute left-4 top-4 z-10 max-w-[320px] rounded-lg border border-slate-700/80 bg-slate-950/85 px-3 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
                     <div className="mb-1 font-semibold text-slate-100">
                       Bản đồ hệ sinh thái kiến trúc
                     </div>
                     <div className="space-y-0.5">
                       <div>
-                        <span className="text-indigo-300">Trung tâm:</span>{" "}
-                        hub có nhiều kết nối và mức trọng yếu cao
+                        <span className="text-indigo-300">Trung tâm:</span> hub
+                        có nhiều kết nối và mức trọng yếu cao
                       </div>
                       <div>
                         <span className="text-emerald-300">Xung quanh:</span>{" "}
@@ -3083,6 +3162,54 @@ function ArchitectureContent() {
                       <div>
                         <span className="text-amber-300">Luồng:</span> click hệ
                         thống để soi kết nối và chi tiết tích hợp
+                      </div>
+                      <div>
+                        <span className="text-sky-300">Hub:</span> tính theo kết
+                        nối + core + criticality + active + arch score
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute right-4 top-4 z-10 w-[300px] rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-semibold text-slate-100">
+                          Đọc nhanh hệ sinh thái
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {architectureSummary.visibleSystems}/{systems.length}{" "}
+                          hệ thống · {architectureSummary.zones} cụm vệ tinh
+                        </div>
+                      </div>
+                      <div className="rounded-full border border-indigo-400/40 bg-indigo-400/10 px-2 py-1 text-[10px] font-semibold text-indigo-200">
+                        Ecosystem
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div className="rounded-lg border border-indigo-400/20 bg-indigo-400/10 p-2">
+                        <div className="text-slate-400">Hub trung tâm</div>
+                        <div className="text-lg font-bold text-indigo-200">
+                          {architectureSummary.hubs}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-2">
+                        <div className="text-slate-400">Vệ tinh</div>
+                        <div className="text-lg font-bold text-emerald-200">
+                          {architectureSummary.satellites}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-orange-400/20 bg-orange-400/10 p-2">
+                        <div className="text-slate-400">Critical flow</div>
+                        <div className="text-lg font-bold text-orange-200">
+                          {architectureSummary.criticalIntegrations}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
+                        <div className="text-slate-400">Cần chú ý</div>
+                        <div className="text-lg font-bold text-red-200">
+                          {architectureSummary.issueIntegrations +
+                            architectureSummary.nonCompliantIntegrations +
+                            architectureSummary.highDebtSystems}
+                        </div>
                       </div>
                     </div>
                   </div>
