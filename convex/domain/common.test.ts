@@ -4,6 +4,8 @@ import {
   normalizeEmail,
   numberInRange,
   orderedDates,
+  requiredIsoDate,
+  requiredOrderedDates,
   requiredText,
   uniqueTexts,
 } from "./common";
@@ -20,12 +22,53 @@ describe("domain common validators", () => {
     expect(() => isoDate("2026-02-30", "date")).toThrow();
   });
 
+  it("rejects non-finite numbers before range-checking them", () => {
+    expect(() => numberInRange(NaN, 0, 100, "score")).toThrow();
+    expect(() => numberInRange(Infinity, 0, 100, "score")).toThrow();
+  });
+
+  it("rejects a date string that isn't YYYY-MM-DD shaped", () => {
+    expect(() => isoDate("01/01/2026", "date")).toThrow();
+    expect(() => isoDate("not-a-date", "date")).toThrow();
+  });
+
+  it("rejects an invalid email format", () => {
+    expect(() => normalizeEmail("not-an-email")).toThrow();
+  });
+
   it("validates date ordering", () => {
     expect(orderedDates("2026-01-01", "2026-01-31")).toEqual({
       start: "2026-01-01",
       end: "2026-01-31",
     });
     expect(() => orderedDates("2026-02-01", "2026-01-31")).toThrow();
+  });
+
+  it("treats a missing date as absent, not required", () => {
+    expect(orderedDates(undefined, undefined)).toEqual({
+      start: undefined,
+      end: undefined,
+    });
+    expect(orderedDates("", "   ")).toEqual({
+      start: undefined,
+      end: undefined,
+    });
+  });
+
+  it("requiredIsoDate rejects empty/whitespace instead of returning undefined", () => {
+    expect(requiredIsoDate("2026-01-01", "startDate")).toBe("2026-01-01");
+    expect(() => requiredIsoDate("", "startDate")).toThrow();
+    expect(() => requiredIsoDate("   ", "startDate")).toThrow();
+  });
+
+  it("requiredOrderedDates rejects missing bounds and reversed ranges", () => {
+    expect(requiredOrderedDates("2026-01-01", "2026-01-31")).toEqual({
+      start: "2026-01-01",
+      end: "2026-01-31",
+    });
+    expect(() => requiredOrderedDates("", "2026-01-31")).toThrow();
+    expect(() => requiredOrderedDates("2026-01-01", "")).toThrow();
+    expect(() => requiredOrderedDates("2026-02-01", "2026-01-31")).toThrow();
   });
 
   it("deduplicates normalized text while retaining first spelling", () => {

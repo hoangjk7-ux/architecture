@@ -168,6 +168,23 @@ export default defineSchema({
     order: v.number(),
   }).index("by_type", ["type"]),
 
+  internal_resource_rates: defineTable({
+    name: v.string(),
+    monthlyRate: v.number(),
+    description: v.optional(v.string()),
+  }),
+
+  system_internal_resources: defineTable({
+    systemId: v.id("software_systems"),
+    resourceRateId: v.id("internal_resource_rates"),
+    headcount: v.number(),
+    allocationPercent: v.number(),
+    startDate: v.string(),
+    endDate: v.string(),
+  })
+    .index("by_system", ["systemId"])
+    .index("by_rate", ["resourceRateId"]),
+
   system_change_logs: defineTable({
     systemId: v.optional(v.id("software_systems")),
     systemName: v.string(),

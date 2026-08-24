@@ -130,7 +130,13 @@ export const remove = mutation({
 
     // Clean up everything that references this system so it doesn't keep
     // showing up as a dangling reference (e.g. on the Integrations page).
-    const [asSource, asDestination, modules, roadmapItems] = await Promise.all([
+    const [
+      asSource,
+      asDestination,
+      modules,
+      resourceAllocations,
+      roadmapItems,
+    ] = await Promise.all([
       ctx.db
         .query("integrations")
         .withIndex("by_source", (q) => q.eq("sourceSystemId", args.id))
@@ -145,6 +151,10 @@ export const remove = mutation({
         .query("system_modules")
         .withIndex("by_system", (q) => q.eq("systemId", args.id))
         .collect(),
+      ctx.db
+        .query("system_internal_resources")
+        .withIndex("by_system", (q) => q.eq("systemId", args.id))
+        .collect(),
       ctx.db.query("roadmap_items").collect(),
     ]);
     const integrationIds = new Set(
@@ -154,6 +164,7 @@ export const remove = mutation({
     await Promise.all([
       ...Array.from(integrationIds).map((id) => ctx.db.delete(id)),
       ...modules.map((m) => ctx.db.delete(m._id)),
+      ...resourceAllocations.map((allocation) => ctx.db.delete(allocation._id)),
       ...roadmapItems
         .filter((r) => r.relatedSystemIds.includes(args.id))
         .map((r) =>

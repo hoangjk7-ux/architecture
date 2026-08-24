@@ -41,6 +41,7 @@ import {
   DollarSign,
   PlusCircle,
   Pencil,
+  UsersRound,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user.ts";
 import { useLanguage } from "@/components/providers/language.tsx";
@@ -226,6 +227,53 @@ function SystemDetailPanel({
   const { t } = useLanguage();
   const modules =
     useQuery(api.system_modules.listBySystem, { systemId: system._id }) ?? [];
+  const resourceRates = useQuery(api.internal_resources.listRates) ?? [];
+  const allocations =
+    useQuery(api.internal_resources.listBySystem, { systemId: system._id }) ??
+    [];
+  const createAllocation = useMutation(api.internal_resources.createAllocation);
+  const removeAllocation = useMutation(api.internal_resources.removeAllocation);
+  const [showResourceForm, setShowResourceForm] = useState(false);
+  const [resourceRateId, setResourceRateId] = useState<
+    Id<"internal_resource_rates"> | ""
+  >("");
+  const [headcount, setHeadcount] = useState(1);
+  const [allocationPercent, setAllocationPercent] = useState(100);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const estimatedInternalBudget = allocations.reduce(
+    (sum, item) => sum + item.estimatedCost,
+    0,
+  );
+
+  const addAllocation = async () => {
+    if (!resourceRateId || !startDate || !endDate) {
+      toast.error("Vui lòng chọn vai trò và timeline");
+      return;
+    }
+    try {
+      await createAllocation({
+        systemId: system._id,
+        resourceRateId,
+        headcount,
+        allocationPercent,
+        startDate,
+        endDate,
+      });
+      setShowResourceForm(false);
+      setResourceRateId("");
+      setHeadcount(1);
+      setAllocationPercent(100);
+      setStartDate("");
+      setEndDate("");
+      toast.success("Đã thêm nguồn lực và cập nhật ngân sách");
+    } catch (err: unknown) {
+      toast.error(
+        (err as { data?: { message?: string } })?.data?.message ??
+          "Không thể thêm nguồn lực",
+      );
+    }
+  };
 
   const typeColors: Record<
     string,
@@ -486,6 +534,160 @@ function SystemDetailPanel({
             </div>
           </div>
         )}
+
+        {/* Details */}
+        <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-400 flex items-center gap-1">
+                <UsersRound className="h-3 w-3" />
+                Ngân sách nguồn lực nội bộ
+              </div>
+              <div className="text-lg font-bold text-cyan-300 mt-1">
+                {formatVnd(estimatedInternalBudget)}
+              </div>
+            </div>
+            {canWrite && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[10px]"
+                onClick={() => setShowResourceForm((value) => !value)}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Nguồn lực
+              </Button>
+            )}
+          </div>
+          {allocations.length === 0 && !showResourceForm && (
+            <p className="text-[10px] text-muted-foreground">
+              Chưa có nguồn lực triển khai được phân bổ.
+            </p>
+          )}
+          <div className="space-y-2">
+            {allocations.map((item) => (
+              <div
+                key={item._id}
+                className="rounded bg-background/60 p-2 text-[10px]"
+              >
+                <div className="flex justify-between gap-2">
+                  <span className="font-semibold">
+                    {item.rate?.name ?? "Đơn giá đã xoá"} · {item.headcount}{" "}
+                    người · {item.allocationPercent}%
+                  </span>
+                  {canWrite && (
+                    <button
+                      className="text-muted-foreground hover:text-red-400 cursor-pointer"
+                      onClick={async () => {
+                        try {
+                          await removeAllocation({ id: item._id });
+                          toast.success("Đã xoá phân bổ");
+                        } catch (err: unknown) {
+                          toast.error(
+                            (err as { data?: { message?: string } })?.data
+                              ?.message ?? "Không thể xoá phân bổ",
+                          );
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex justify-between text-muted-foreground mt-1">
+                  <span>
+                    {item.startDate} → {item.endDate} ({item.months.toFixed(1)}{" "}
+                    tháng)
+                  </span>
+                  <span className="text-cyan-400 font-medium">
+                    {formatVnd(item.estimatedCost)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {showResourceForm && (
+            <div className="space-y-2 pt-2 border-t border-cyan-500/20">
+              {resourceRates.length === 0 ? (
+                <p className="text-[10px] text-yellow-400">
+                  Hãy khai báo đơn giá tại trang Cài đặt trước.
+                </p>
+              ) : (
+                <>
+                  <Select
+                    value={resourceRateId}
+                    onValueChange={(value) =>
+                      setResourceRateId(value as Id<"internal_resource_rates">)
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs bg-input">
+                      <SelectValue placeholder="Chọn vai trò/đơn giá" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {resourceRates.map((rate) => (
+                        <SelectItem key={rate._id} value={rate._id}>
+                          {rate.name} — {formatVnd(rate.monthlyRate)}/tháng
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-[10px]">Số người</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={headcount}
+                        onChange={(e) => setHeadcount(Number(e.target.value))}
+                        className="h-8 text-xs bg-input"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px]">Phân bổ (%)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={allocationPercent}
+                        onChange={(e) =>
+                          setAllocationPercent(Number(e.target.value))
+                        }
+                        className="h-8 text-xs bg-input"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-[10px]">Bắt đầu</Label>
+                      <Input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="h-8 text-xs bg-input"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px]">Kết thúc</Label>
+                      <Input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="h-8 text-xs bg-input"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-8 w-full"
+                    onClick={addAllocation}
+                  >
+                    Thêm và tính ngân sách
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Details */}
         <div className="space-y-1.5 text-[11px]">

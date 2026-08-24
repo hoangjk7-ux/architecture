@@ -103,6 +103,37 @@ export function orderedDates(
   return { start: normalizedStart, end: normalizedEnd };
 }
 
+export function requiredIsoDate(value: string, field: string): string {
+  // `isoDate` treats "" / whitespace-only as "not provided" and returns
+  // `undefined` — correct for optional dates, but silently wrong for a date
+  // that is required. Fail closed here so callers that need a mandatory
+  // date can't end up with `undefined` flowing into arithmetic or a
+  // required schema field.
+  requiredText(value, field);
+  // `requiredText` above already threw on empty/whitespace, so `isoDate`
+  // (which only returns `undefined` for that same case) is guaranteed to
+  // either return a normalized string or throw here — never `undefined`.
+  return isoDate(value, field) as string;
+}
+
+export function requiredOrderedDates(
+  start: string,
+  end: string,
+  startField = "startDate",
+  endField = "dueDate",
+): { start: string; end: string } {
+  const normalizedStart = requiredIsoDate(start, startField);
+  const normalizedEnd = requiredIsoDate(end, endField);
+  if (normalizedStart > normalizedEnd) {
+    domainError(
+      "VALIDATION_ERROR",
+      `${startField} must not be after ${endField}`,
+      startField,
+    );
+  }
+  return { start: normalizedStart, end: normalizedEnd };
+}
+
 export function normalizeEmail(value: string, field = "email"): string {
   const normalized = requiredText(value, field).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {

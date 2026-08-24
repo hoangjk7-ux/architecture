@@ -33,6 +33,7 @@ import ReactFlow, {
   type Edge,
   type EdgeProps,
   type NodeProps,
+  type MiniMapNodeProps,
   MarkerType,
   Handle,
   Position,
@@ -219,7 +220,16 @@ interface NodeData {
   outCount: number;
   worstHealth: string;
   isSelected: boolean;
+  isCentral: boolean;
 }
+
+interface ZoneNodeData {
+  title: string;
+  subtitle: string;
+  accent: string;
+}
+
+type ArchitectureNodeData = NodeData | ZoneNodeData;
 
 function ScoreBar({ value, color }: { value: number; color: string }) {
   return (
@@ -245,7 +255,14 @@ function scoreTone(value: number, goodAtHigh = true) {
 }
 
 function SystemNode({ data }: NodeProps<NodeData>) {
-  const { system: s, inCount, outCount, worstHealth, isSelected } = data;
+  const {
+    system: s,
+    inCount,
+    outCount,
+    worstHealth,
+    isSelected,
+    isCentral,
+  } = data;
   const meta = TYPE_META[s.type] ?? TYPE_META.core;
   const statusMeta = STATUS_META[s.status] ?? STATUS_META.inactive;
   const healthColor = HEALTH_META[worstHealth]?.color ?? "#6b7280";
@@ -305,6 +322,23 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           {meta.label}
         </span>
         <span style={{ color: "#fff", fontSize: 10, opacity: 0.9 }}>
+          {isCentral ? (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                marginRight: 6,
+                padding: "1px 5px",
+                borderRadius: 999,
+                background: "#ffffff22",
+                fontSize: 8,
+                fontWeight: 700,
+              }}
+            >
+              Hub
+            </span>
+          ) : null}
           <span style={{ color: statusMeta.color }}>{statusMeta.icon}</span>{" "}
           {s.status}
         </span>
@@ -449,7 +483,93 @@ function SystemNode({ data }: NodeProps<NodeData>) {
     </div>
   );
 }
-const nodeTypes = { system: SystemNode };
+
+function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        border: `1px solid ${data.accent}55`,
+        borderRadius: 18,
+        background: `${data.accent}10`,
+        boxShadow: `inset 0 0 32px ${data.accent}10`,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          padding: "12px 14px",
+          color: data.accent,
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: 0.2,
+          textTransform: "uppercase",
+        }}
+      >
+        {data.title}
+      </div>
+      <div
+        style={{
+          padding: "0 14px",
+          color: "#94a3b8",
+          fontSize: 9,
+          maxWidth: 220,
+        }}
+      >
+        {data.subtitle}
+      </div>
+    </div>
+  );
+}
+
+const nodeTypes = { system: SystemNode, zone: ZoneNode };
+
+// Zone background regions share the node id prefix "zone-" (see
+// `layoutNodes`'s `zones` array below) — used to tell them apart from
+// system nodes anywhere we only have an id to go on (e.g. inside MiniMap).
+function isZoneNodeId(id: string): boolean {
+  return id.startsWith("zone-");
+}
+
+// React Flow's <MiniMap> renders every node with a measured width/height
+// that isn't `hidden` (see @reactflow/minimap's node selector) — that
+// includes the six full-size zone background regions, which have no
+// `system` to color by and end up as large default-colored blocks
+// swamping the actual system dots. Zones are layout chrome, not part of
+// the map being summarized, so exclude them from the minimap entirely
+// instead of trying to pick a color for them.
+function ArchitectureMiniMapNode(props: MiniMapNodeProps) {
+  if (isZoneNodeId(props.id)) return null;
+  const {
+    id,
+    x,
+    y,
+    width,
+    height,
+    color,
+    strokeColor,
+    strokeWidth,
+    className,
+    borderRadius,
+    onClick,
+  } = props;
+  return (
+    <rect
+      className={className}
+      x={x}
+      y={y}
+      rx={borderRadius}
+      ry={borderRadius}
+      width={width}
+      height={height}
+      fill={color}
+      stroke={strokeColor}
+      strokeWidth={strokeWidth}
+      onClick={onClick ? (event) => onClick(event, id) : undefined}
+    />
+  );
+}
 
 // ─── Glow Edge ────────────────────────────────────────────────────────────────
 function GlowEdge({
@@ -525,6 +645,24 @@ type IntegrationMetrics = {
   worstHealth: string;
 };
 
+type ArchitectureZone = {
+  id: string;
+  title: string;
+  subtitle: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  accent: string;
+};
+
+type ArchitectureLayout = {
+  positions: Record<string, { x: number; y: number }>;
+  centralIds: Set<string>;
+  zones: ArchitectureZone[];
+  metrics: globalThis.Map<string, IntegrationMetrics>;
+};
+
 function buildIntegrationMetrics(integrations: Integration[]) {
   const metrics = new globalThis.Map<string, IntegrationMetrics>();
   const getMetrics = (systemId: string) => {
@@ -572,38 +710,232 @@ function worstHealthFor(sysId: string, integrations: Integration[]): string {
 }
 function layoutNodes(
   systems: System[],
-): Record<string, { x: number; y: number }> {
-  const groups: Record<string, System[]> = {
-    core: [],
-    supporting: [],
-    legacy: [],
-    pilot: [],
-  };
-  systems.forEach((s) => {
-    (groups[s.type] ?? groups.core).push(s);
-  });
+  integrations: Integration[],
+): ArchitectureLayout {
+  const metrics = buildIntegrationMetrics(integrations);
   const positions: Record<string, { x: number; y: number }> = {};
-  const COL_W = 220,
-    ROW_H = 200;
-  const coreStart = Math.max(0, 1 - Math.floor(groups.core.length / 2));
-  groups.core.forEach((s, i) => {
-    positions[s._id] = { x: (coreStart + i) * COL_W + 60, y: 40 };
+
+  if (!systems.length) {
+    return { positions, centralIds: new Set(), zones: [], metrics };
+  }
+
+  const centralityScore = (system: System) => {
+    const m = metrics.get(system._id);
+    const connectionScore = (m?.inCount ?? 0) + (m?.outCount ?? 0);
+    return (
+      connectionScore * 4 +
+      (system.type === "core" ? 18 : 0) +
+      (system.criticality === "high" ? 8 : 0) +
+      (system.status === "active" ? 3 : 0) +
+      Math.round(system.architectureScore / 25)
+    );
+  };
+
+  const sorted = [...systems].sort((a, b) => {
+    const scoreDelta = centralityScore(b) - centralityScore(a);
+    if (scoreDelta !== 0) return scoreDelta;
+    return a.name.localeCompare(b.name);
   });
-  const supStart = Math.max(0, 1 - Math.floor(groups.supporting.length / 2));
-  groups.supporting.forEach((s, i) => {
-    positions[s._id] = { x: (supStart + i) * COL_W + 60, y: 40 + ROW_H };
+  const coreSystems = sorted.filter((system) => system.type === "core");
+  const centralCount = Math.min(
+    Math.max(coreSystems.length, systems.length > 8 ? 3 : 2),
+    Math.max(1, Math.min(5, systems.length)),
+  );
+  const centralIds = new Set(sorted.slice(0, centralCount).map((s) => s._id));
+
+  const centerX = 560;
+  const centerY = 260;
+  const rowGap = 190;
+  const colGap = 250;
+  const laneTop = 40;
+  const laneBottom = centerY + Math.max(2, centralCount) * rowGap;
+
+  const placeColumn = (
+    items: System[],
+    x: number,
+    startY: number,
+    gap = rowGap,
+  ) => {
+    items.forEach((system, index) => {
+      positions[system._id] = { x, y: startY + index * gap };
+    });
+  };
+
+  const central = sorted.filter((system) => centralIds.has(system._id));
+  placeColumn(central, centerX, centerY - ((central.length - 1) * rowGap) / 2);
+
+  const satellites = sorted.filter((system) => !centralIds.has(system._id));
+  const connectedSatellites = satellites.filter((system) =>
+    integrations.some(
+      (integration) =>
+        (centralIds.has(integration.sourceSystemId) &&
+          integration.destinationSystemId === system._id) ||
+        (centralIds.has(integration.destinationSystemId) &&
+          integration.sourceSystemId === system._id),
+    ),
+  );
+  const connectedIds = new Set(connectedSatellites.map((system) => system._id));
+  const pilots = satellites.filter(
+    (system) => system.type === "pilot" && !connectedIds.has(system._id),
+  );
+  const legacy = satellites.filter(
+    (system) => system.type === "legacy" && !connectedIds.has(system._id),
+  );
+  const outer = satellites.filter(
+    (system) =>
+      !connectedIds.has(system._id) &&
+      system.type !== "pilot" &&
+      system.type !== "legacy",
+  );
+
+  // "Vệ tinh nguồn" (left) = feeds data INTO the hub; "Vệ tinh tiêu thụ"
+  // (right) = receives data FROM the hub. Assign by actual integration
+  // direction against the hub, not by array index — a satellite that only
+  // ever sends to the hub must not land in the "consumer" column just
+  // because of its position in the sorted list. Bidirectional/ambiguous
+  // satellites fall back to whichever column is currently smaller, to keep
+  // the layout reasonably balanced.
+  const left: System[] = [];
+  const right: System[] = [];
+  connectedSatellites.forEach((system) => {
+    const feedsIntoHub = integrations.some(
+      (integration) =>
+        integration.sourceSystemId === system._id &&
+        centralIds.has(integration.destinationSystemId),
+    );
+    const receivesFromHub = integrations.some(
+      (integration) =>
+        integration.destinationSystemId === system._id &&
+        centralIds.has(integration.sourceSystemId),
+    );
+    if (feedsIntoHub && !receivesFromHub) {
+      left.push(system);
+    } else if (receivesFromHub && !feedsIntoHub) {
+      right.push(system);
+    } else {
+      (left.length <= right.length ? left : right).push(system);
+    }
   });
-  groups.pilot.forEach((s, i) => {
-    positions[s._id] = {
-      x: 60 + (groups.supporting.length + i) * COL_W,
-      y: 40 + ROW_H,
+  placeColumn(
+    left,
+    centerX - colGap,
+    centerY - ((left.length - 1) * rowGap) / 2,
+  );
+  placeColumn(
+    right,
+    centerX + colGap,
+    centerY - ((right.length - 1) * rowGap) / 2,
+  );
+
+  pilots.forEach((system, index) => {
+    positions[system._id] = {
+      x: centerX - ((pilots.length - 1) * colGap) / 2 + index * colGap,
+      y: laneTop,
     };
   });
-  const legStart = Math.max(0, 1 - Math.floor(groups.legacy.length / 2));
-  groups.legacy.forEach((s, i) => {
-    positions[s._id] = { x: (legStart + i) * COL_W + 60, y: 40 + ROW_H * 2 };
+  legacy.forEach((system, index) => {
+    positions[system._id] = {
+      x: centerX - ((legacy.length - 1) * colGap) / 2 + index * colGap,
+      y: laneBottom,
+    };
   });
-  return positions;
+  placeColumn(
+    outer,
+    centerX + colGap * 2,
+    centerY - ((outer.length - 1) * rowGap) / 2,
+  );
+
+  const maxColumnItems = Math.max(left.length, right.length, outer.length, 2);
+  const mainZoneHeight = maxColumnItems * rowGap + 90;
+  const mainZoneY = centerY - mainZoneHeight / 2 + 45;
+  const pilotWidth = Math.max(420, pilots.length * colGap + 120);
+  const legacyWidth = Math.max(560, legacy.length * colGap + 120);
+
+  // A zone with no system in it still has a full-size box that
+  // participates in React Flow's `fitView` bounds and the MiniMap — it
+  // reads as an empty gap in the viewport instead of just not being drawn.
+  // Only keep zones that actually have at least one system placed in them.
+  const nonEmptyZoneIds = new Set<string>();
+  if (pilots.length) nonEmptyZoneIds.add("zone-pilot");
+  if (left.length) nonEmptyZoneIds.add("zone-satellite-left");
+  if (central.length) nonEmptyZoneIds.add("zone-core");
+  if (right.length) nonEmptyZoneIds.add("zone-satellite-right");
+  if (outer.length) nonEmptyZoneIds.add("zone-outer");
+  if (legacy.length) nonEmptyZoneIds.add("zone-legacy");
+
+  return {
+    positions,
+    centralIds,
+    metrics,
+    zones: [
+      {
+        id: "zone-pilot",
+        title: "Pilot / thử nghiệm",
+        subtitle: "Các hệ thống đang kiểm chứng trước khi đưa vào lõi vận hành",
+        x: centerX - pilotWidth / 2 - 30,
+        y: laneTop - 35,
+        width: pilotWidth,
+        height: 165,
+        accent: "#38bdf8",
+      },
+      {
+        id: "zone-satellite-left",
+        title: "Vệ tinh nguồn",
+        subtitle:
+          "Nguồn dữ liệu, kênh phát sinh hoặc hệ thống đẩy luồng vào hub",
+        x: centerX - colGap - 55,
+        y: mainZoneY,
+        width: 230,
+        height: mainZoneHeight,
+        accent: "#22c55e",
+      },
+      {
+        id: "zone-core",
+        title: "Trung tâm kiến trúc",
+        subtitle: "Hub ưu tiên theo số kết nối, loại core và mức trọng yếu",
+        x: centerX - 55,
+        y: centerY - (central.length * rowGap) / 2 - 35,
+        width: 230,
+        height: Math.max(260, central.length * rowGap + 70),
+        accent: "#a78bfa",
+      },
+      {
+        id: "zone-satellite-right",
+        title: "Vệ tinh tiêu thụ",
+        subtitle: "Hệ thống nhận dữ liệu, phụ thuộc hoặc phục vụ luồng từ hub",
+        x: centerX + colGap - 55,
+        y: mainZoneY,
+        width: 230,
+        height: mainZoneHeight,
+        accent: "#f97316",
+      },
+      {
+        id: "zone-outer",
+        title: "Vệ tinh ngoài biên",
+        subtitle: "Hệ thống ít liên kết trực tiếp với hub, cần rà soát vai trò",
+        x: centerX + colGap * 2 - 55,
+        y: mainZoneY,
+        width: 230,
+        height: mainZoneHeight,
+        accent: "#64748b",
+      },
+      {
+        id: "zone-legacy",
+        title: "Legacy / chuyển đổi",
+        subtitle:
+          "Nợ kỹ thuật, kế hoạch thay thế hoặc hệ thống cần tách khỏi lõi",
+        x: centerX - legacyWidth / 2 - 30,
+        y: laneBottom - 35,
+        width: legacyWidth,
+        // Legacy systems are always placed on a single row (see the
+        // `legacy.forEach` placement above, same as the pilot lane) — the
+        // box height must match that single row, not a wrapped multi-row
+        // estimate the placement never actually produces.
+        height: 165,
+        accent: "#f59e0b",
+      },
+    ].filter((zone) => nonEmptyZoneIds.has(zone.id)),
+  };
 }
 
 // ─── Module Form ─────────────────────────────────────────────────────────────
@@ -2275,11 +2607,13 @@ function ArchitectureContent() {
     () => allModules.filter((m) => m.systemId === selectedId),
     [allModules, selectedId],
   );
-  const positions = useMemo(() => layoutNodes(systems), [systems]);
-  const integrationMetrics = useMemo(
-    () => buildIntegrationMetrics(integrations),
-    [integrations],
+  const architectureLayout = useMemo(
+    () => layoutNodes(systems, integrations),
+    [systems, integrations],
   );
+  // Reuse the metrics `layoutNodes` already computed for centralityScore
+  // instead of running the same O(integrations) aggregation a second time.
+  const integrationMetrics = architectureLayout.metrics;
 
   const connectedIntegrations = useMemo(() => {
     if (!selectedId) return [];
@@ -2319,45 +2653,67 @@ function ArchitectureContent() {
     return ids;
   }, [selectedId, integrations]);
 
-  const nodes: Node<NodeData>[] = useMemo(
-    () =>
-      systems.map((s) => {
-        const metrics = integrationMetrics.get(s._id) ?? {
-          inCount: 0,
-          outCount: 0,
-          worstHealth: "unknown",
-        };
-        return {
-          id: s._id,
-          type: "system",
-          position: positions[s._id] ?? { x: 0, y: 0 },
-          data: {
-            system: s,
-            inCount: metrics.inCount,
-            outCount: metrics.outCount,
-            worstHealth: metrics.worstHealth,
-            isSelected: selectedId === s._id,
-          },
-          style: {
-            opacity: selectedId
-              ? connectedNodeIds!.has(s._id)
-                ? 1
-                : 0.2
-              : filteredIds.has(s._id)
-                ? 1
-                : 0.2,
-          },
-        };
+  const nodes: Node<ArchitectureNodeData>[] = useMemo(() => {
+    const zoneNodes: Node<ZoneNodeData>[] = architectureLayout.zones.map(
+      (zone) => ({
+        id: zone.id,
+        type: "zone",
+        position: { x: zone.x, y: zone.y },
+        data: {
+          title: zone.title,
+          subtitle: zone.subtitle,
+          accent: zone.accent,
+        },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+        focusable: false,
+        zIndex: -1,
+        style: {
+          width: zone.width,
+          height: zone.height,
+          pointerEvents: "none",
+        },
       }),
-    [
-      systems,
-      integrationMetrics,
-      positions,
-      selectedId,
-      filteredIds,
-      connectedNodeIds,
-    ],
-  );
+    );
+    const systemNodes: Node<NodeData>[] = systems.map((s) => {
+      const metrics = integrationMetrics.get(s._id) ?? {
+        inCount: 0,
+        outCount: 0,
+        worstHealth: "unknown",
+      };
+      return {
+        id: s._id,
+        type: "system",
+        position: architectureLayout.positions[s._id] ?? { x: 0, y: 0 },
+        data: {
+          system: s,
+          inCount: metrics.inCount,
+          outCount: metrics.outCount,
+          worstHealth: metrics.worstHealth,
+          isSelected: selectedId === s._id,
+          isCentral: architectureLayout.centralIds.has(s._id),
+        },
+        style: {
+          opacity: selectedId
+            ? connectedNodeIds!.has(s._id)
+              ? 1
+              : 0.2
+            : filteredIds.has(s._id)
+              ? 1
+              : 0.2,
+        },
+      };
+    });
+    return [...zoneNodes, ...systemNodes];
+  }, [
+    systems,
+    integrationMetrics,
+    architectureLayout,
+    selectedId,
+    filteredIds,
+    connectedNodeIds,
+  ]);
 
   const edges: Edge[] = useMemo(
     () =>
@@ -2648,6 +3004,25 @@ function ArchitectureContent() {
                   }}
                   onPaneClick={() => setSelectedId(null)}
                 >
+                  <div className="absolute left-4 top-4 z-10 rounded-lg border border-slate-700/80 bg-slate-950/85 px-3 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
+                    <div className="mb-1 font-semibold text-slate-100">
+                      Bố cục trung tâm - vệ tinh
+                    </div>
+                    <div className="space-y-0.5">
+                      <div>
+                        <span className="text-indigo-300">Giữa:</span> core,
+                        critical, nhiều kết nối
+                      </div>
+                      <div>
+                        <span className="text-emerald-300">Hai bên:</span> vệ
+                        tinh đang tích hợp trực tiếp
+                      </div>
+                      <div>
+                        <span className="text-amber-300">Trên/dưới:</span> pilot
+                        và legacy
+                      </div>
+                    </div>
+                  </div>
                   <Background color="#1e293b" gap={28} size={1} />
                   <Controls
                     style={{
@@ -2656,6 +3031,7 @@ function ArchitectureContent() {
                     }}
                   />
                   <MiniMap
+                    nodeComponent={ArchitectureMiniMapNode}
                     nodeColor={(node) =>
                       TYPE_META[
                         systems.find((s) => s._id === node.id)?.type ?? "core"

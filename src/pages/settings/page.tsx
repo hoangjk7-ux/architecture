@@ -4,6 +4,13 @@ import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 import { toast } from "sonner";
 import {
   Settings,
@@ -15,6 +22,7 @@ import {
   Trash2,
   Check,
   X,
+  UsersRound,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user.ts";
 import { useLanguage } from "@/components/providers/language.tsx";
@@ -22,6 +30,140 @@ import type { Id, Doc } from "@/convex/_generated/dataModel.d.ts";
 
 type ConfigItem = Doc<"config_items">;
 type ConfigType = "category" | "department" | "campus";
+
+function ResourceRateCard({ canWrite }: { canWrite: boolean }) {
+  const rates = useQuery(api.internal_resources.listRates) ?? [];
+  const createRate = useMutation(api.internal_resources.createRate);
+  const updateRate = useMutation(api.internal_resources.updateRate);
+  const [name, setName] = useState("");
+  const [monthlyRate, setMonthlyRate] = useState("");
+  const [editingId, setEditingId] =
+    useState<Id<"internal_resource_rates"> | null>(null);
+  const availableRoles = ["BA", "Dev"].filter(
+    (role) => !rates.some((rate) => rate.name === role),
+  );
+
+  const save = async () => {
+    if (!name.trim() || !monthlyRate || Number(monthlyRate) < 0) return;
+    try {
+      if (editingId)
+        await updateRate({
+          id: editingId,
+          name,
+          monthlyRate: Number(monthlyRate),
+        });
+      else await createRate({ name, monthlyRate: Number(monthlyRate) });
+      setName("");
+      setMonthlyRate("");
+      setEditingId(null);
+      toast.success(editingId ? "Đã cập nhật đơn giá" : "Đã thêm đơn giá");
+    } catch (err: unknown) {
+      toast.error(
+        (err as { data?: { message?: string } })?.data?.message ??
+          "Không thể lưu đơn giá",
+      );
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden md:col-span-3">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/20">
+        <div className="p-2 rounded-lg bg-muted text-cyan-400">
+          <UsersRound className="h-4 w-4" />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-sm">Đơn giá nguồn lực nội bộ</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Chi phí chuẩn theo tháng, dùng để lập ngân sách triển khai phần mềm
+          </p>
+        </div>
+        <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+          {rates.length}
+        </span>
+      </div>
+      <div className="divide-y divide-border/50">
+        {rates.length === 0 && (
+          <div className="py-6 text-center text-xs text-muted-foreground">
+            Chưa khai báo đơn giá nguồn lực
+          </div>
+        )}
+        {rates.map((rate) => (
+          <div
+            key={rate._id}
+            className="flex items-center gap-3 px-4 py-2.5 group"
+          >
+            <span className="flex-1 text-sm font-medium">{rate.name}</span>
+            <span className="text-sm text-cyan-400">
+              {rate.monthlyRate.toLocaleString("vi-VN")} ₫/người/tháng
+            </span>
+            {canWrite && (
+              <div className="flex gap-1">
+                <button
+                  className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={() => {
+                    setEditingId(rate._id);
+                    setName(rate.name);
+                    setMonthlyRate(String(rate.monthlyRate));
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {canWrite && (editingId || availableRoles.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 p-3 border-t border-border bg-muted/10">
+          <Select value={name} onValueChange={setName} disabled={!!editingId}>
+            <SelectTrigger className="h-8 text-xs bg-input">
+              <SelectValue placeholder="Chọn BA hoặc Dev" />
+            </SelectTrigger>
+            <SelectContent>
+              {(editingId ? [name] : availableRoles).map((role) => (
+                <SelectItem key={role} value={role}>
+                  {role}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="number"
+            min={0}
+            value={monthlyRate}
+            onChange={(e) => setMonthlyRate(e.target.value)}
+            placeholder="Đơn giá/người/tháng (₫)"
+            className="h-8 text-xs bg-input"
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!name.trim() || !monthlyRate}
+              onClick={save}
+            >
+              {editingId ? "Cập nhật" : "Thêm đơn giá"}
+            </Button>
+            {editingId && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8"
+                onClick={() => {
+                  setEditingId(null);
+                  setName("");
+                  setMonthlyRate("");
+                }}
+              >
+                Huỷ
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CARD_CONFIG: Record<
   ConfigType,
@@ -268,6 +410,7 @@ function SettingsContent() {
               />
             ),
           )}
+          <ResourceRateCard canWrite={canWrite} />
         </div>
       )}
     </div>
