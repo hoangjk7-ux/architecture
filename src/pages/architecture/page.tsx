@@ -245,6 +245,7 @@ interface ZoneNodeData {
   title: string;
   subtitle: string;
   accent: string;
+  isCore: boolean;
 }
 
 type ArchitectureNodeData = NodeData | ZoneNodeData;
@@ -647,40 +648,104 @@ function SystemNode({ data }: NodeProps<NodeData>) {
 }
 
 function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
+  if (data.isCore) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          border: `2px solid ${data.accent}`,
+          borderRadius: 999,
+          background: `radial-gradient(circle at 50% 45%, ${data.accent}38 0%, ${data.accent}1f 38%, #06101fdd 70%)`,
+          boxShadow: `0 0 0 8px ${data.accent}16, 0 0 46px ${data.accent}66, inset 0 0 42px ${data.accent}38`,
+          pointerEvents: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          padding: 28,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              color: "#e0f2fe",
+              fontSize: 18,
+              fontWeight: 900,
+              lineHeight: 1.15,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+              textShadow: `0 0 18px ${data.accent}`,
+            }}
+          >
+            {data.title}
+          </div>
+          <div
+            style={{
+              marginTop: 8,
+              color: "#c4b5fd",
+              fontSize: 10,
+              lineHeight: 1.35,
+              maxWidth: 220,
+            }}
+          >
+            {data.subtitle}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
         width: "100%",
         height: "100%",
-        border: `1px solid ${data.accent}55`,
-        borderRadius: 18,
-        background: `${data.accent}10`,
-        boxShadow: `inset 0 0 32px ${data.accent}10`,
+        border: `1px solid ${data.accent}66`,
+        borderRadius: 24,
+        background: `linear-gradient(135deg, ${data.accent}16 0%, #071426d9 42%, #050b18e8 100%)`,
+        boxShadow: `inset 0 0 38px ${data.accent}12, 0 0 20px ${data.accent}10`,
         pointerEvents: "none",
+        overflow: "hidden",
+        position: "relative",
       }}
     >
       <div
         style={{
-          padding: "12px 14px",
-          color: data.accent,
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: 0.2,
+          padding: "16px 18px 8px",
+          color: "#f8fafc",
+          fontSize: 16,
+          fontWeight: 900,
+          letterSpacing: 0.4,
           textTransform: "uppercase",
+          textShadow: `0 0 14px ${data.accent}66`,
         }}
       >
         {data.title}
       </div>
       <div
         style={{
-          padding: "0 14px",
+          padding: "0 18px",
           color: "#94a3b8",
-          fontSize: 9,
-          maxWidth: 220,
+          fontSize: 10,
+          lineHeight: 1.35,
+          maxWidth: 300,
         }}
       >
         {data.subtitle}
       </div>
+      <div
+        style={{
+          position: "absolute",
+          inset: "auto 18px 12px auto",
+          width: 58,
+          height: 3,
+          borderRadius: 999,
+          background: data.accent,
+          boxShadow: `0 0 18px ${data.accent}`,
+          opacity: 0.75,
+        }}
+      />
     </div>
   );
 }
@@ -1163,9 +1228,9 @@ function layoutNodes(
   const colGap = 36;
   const canvasLeft = 8;
   const topY = 28;
-  const coreWidth = 288;
+  const coreWidth = 360;
   const centralGap = 164;
-  const centralHeight = Math.max(252, 86 + central.length * centralGap);
+  const centralHeight = Math.max(360, 96 + central.length * centralGap);
   const zoneSpecs = new globalThis.Map<
     EcosystemGroupKey,
     {
@@ -1271,13 +1336,13 @@ function layoutNodes(
   const centerY = coreY + centralHeight / 2 - 45;
   central.forEach((system, index) => {
     positions[system._id] = {
-      x: coreX + 34,
+      x: coreX + (coreWidth - 220) / 2,
       y: centerY - ((central.length - 1) * centralGap) / 2 + index * centralGap,
     };
   });
   zones.push({
     id: "zone-core",
-    title: "Trung tâm kiến trúc",
+    title: "Hệ sinh thái kiến trúc hệ thống",
     subtitle:
       central.length === 1
         ? "Hub chính được chọn theo số kết nối, loại core và mức trọng yếu"
@@ -3375,6 +3440,7 @@ function ArchitectureContent() {
             title: zone.title,
             subtitle: zone.subtitle,
             accent: zone.accent,
+            isCore: zone.id === "zone-core",
           },
           draggable: false,
           selectable: false,
@@ -4127,6 +4193,11 @@ function ArchitectureContent() {
                     setSelectedIntegrationId(null);
                   }}
                 >
+                  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+                    <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-cyan-300/15 shadow-[0_0_24px_rgba(34,211,238,0.28)]" />
+                    <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-cyan-300/15 shadow-[0_0_24px_rgba(34,211,238,0.28)]" />
+                    <div className="absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/20 bg-cyan-400/5 shadow-[0_0_80px_rgba(34,211,238,0.22)]" />
+                  </div>
                   <div className="absolute left-4 top-4 z-10">
                     <Popover open={showHelp} onOpenChange={setShowHelp}>
                       <PopoverTrigger asChild>
