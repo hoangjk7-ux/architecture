@@ -663,6 +663,13 @@ function isZoneNodeId(id: string): boolean {
   return id.startsWith("zone-");
 }
 
+function zoneKeyFromNodeId(id: string): SystemZoneKey | null {
+  if (id === "zone-core") return "core";
+  if (!id.startsWith("zone-")) return null;
+  const key = id.replace("zone-", "") as EcosystemGroupKey;
+  return key in ECOSYSTEM_GROUPS ? key : null;
+}
+
 // React Flow's <MiniMap> renders every node with a measured width/height
 // that isn't `hidden` (see @reactflow/minimap's node selector) — that
 // includes the six full-size zone background regions, which have no
@@ -2958,6 +2965,9 @@ function ArchitectureContent() {
   const [edgeFocus, setEdgeFocus] = useState<EdgeFocus>("all");
   const [mapMode, setMapMode] = useState<MapMode>("ecosystem");
   const [selectedZoneKey, setSelectedZoneKey] = useState<ZoneFocus>(null);
+  const [hiddenZoneKeys, setHiddenZoneKeys] = useState<Set<SystemZoneKey>>(
+    () => new Set(),
+  );
 
   const selectedSystem = useMemo(
     () => systems.find((s) => s._id === selectedId) ?? null,
@@ -3061,26 +3071,31 @@ function ArchitectureContent() {
 
   const nodes: Node<ArchitectureNodeData>[] = useMemo(() => {
     const zoneNodes: Node<ZoneNodeData>[] = architectureLayout.zones.map(
-      (zone) => ({
-        id: zone.id,
-        type: "zone",
-        position: { x: zone.x, y: zone.y },
-        data: {
-          title: zone.title,
-          subtitle: zone.subtitle,
-          accent: zone.accent,
-        },
-        draggable: false,
-        selectable: false,
-        connectable: false,
-        focusable: false,
-        zIndex: -1,
-        style: {
-          width: zone.width,
-          height: zone.height,
-          pointerEvents: "none",
-        },
-      }),
+      (zone) => {
+        const zoneKey = zoneKeyFromNodeId(zone.id);
+        const isHidden = zoneKey ? hiddenZoneKeys.has(zoneKey) : false;
+        return {
+          id: zone.id,
+          type: "zone",
+          position: { x: zone.x, y: zone.y },
+          data: {
+            title: zone.title,
+            subtitle: zone.subtitle,
+            accent: zone.accent,
+          },
+          draggable: false,
+          selectable: false,
+          connectable: false,
+          focusable: false,
+          zIndex: -1,
+          style: {
+            width: zone.width,
+            height: zone.height,
+            opacity: isHidden ? 0.04 : 1,
+            pointerEvents: "none",
+          },
+        };
+      },
     );
     const systemNodes: Node<NodeData>[] = systems.map((s) => {
       const metrics = integrationMetrics.get(s._id) ?? {
@@ -3097,6 +3112,9 @@ function ArchitectureContent() {
         (selectedZoneKey === "core" || hubIdsConnectedToFocusedZone.has(s._id));
       const isRiskRelevant =
         riskTone.tone === "high" || riskTone.tone === "medium";
+      const systemZoneKey =
+        systemGroupMap.get(s._id) ?? classifyEcosystemGroup(s);
+      const isHiddenZone = hiddenZoneKeys.has(systemZoneKey);
       return {
         id: s._id,
         type: "system",
@@ -3108,30 +3126,33 @@ function ArchitectureContent() {
           worstHealth: metrics.worstHealth,
           isSelected: selectedId === s._id,
           isCentral,
-          groupKey: systemGroupMap.get(s._id) ?? classifyEcosystemGroup(s),
+          groupKey: systemZoneKey,
           isRiskMode: mapMode === "risk",
           riskTone: riskTone.tone,
           riskColor: riskTone.color,
           riskLabel: riskTone.label,
         },
         style: {
-          opacity: selectedId
-            ? connectedNodeIds!.has(s._id)
-              ? 1
-              : 0.2
-            : selectedZoneKey
-              ? isInFocusedZone
+          opacity: isHiddenZone
+            ? 0.06
+            : selectedId
+              ? connectedNodeIds!.has(s._id)
                 ? 1
-                : isFocusedHub
-                  ? 0.9
-                  : 0.18
-              : filteredIds.has(s._id)
-                ? mapMode === "risk"
-                  ? isRiskRelevant
-                    ? 1
-                    : 0.45
-                  : 1
-                : 0.2,
+                : 0.2
+              : selectedZoneKey
+                ? isInFocusedZone
+                  ? 1
+                  : isFocusedHub
+                    ? 0.9
+                    : 0.18
+                : filteredIds.has(s._id)
+                  ? mapMode === "risk"
+                    ? isRiskRelevant
+                      ? 1
+                      : 0.45
+                    : 1
+                  : 0.2,
+          pointerEvents: isHiddenZone ? "none" : undefined,
         },
       };
     });
@@ -3143,6 +3164,7 @@ function ArchitectureContent() {
     selectedId,
     selectedZoneKey,
     mapMode,
+    hiddenZoneKeys,
     filteredIds,
     connectedNodeIds,
     focusedZoneIds,
@@ -3177,6 +3199,11 @@ function ArchitectureContent() {
         const isFiltered =
           filteredIds.has(intg.sourceSystemId) &&
           filteredIds.has(intg.destinationSystemId);
+        const sourceZoneKey = systemGroupMap.get(intg.sourceSystemId);
+        const targetZoneKey = systemGroupMap.get(intg.destinationSystemId);
+        const isHiddenEdge =
+          (sourceZoneKey ? hiddenZoneKeys.has(sourceZoneKey) : false) ||
+          (targetZoneKey ? hiddenZoneKeys.has(targetZoneKey) : false);
         const sourceInZone = focusedZoneIds?.has(intg.sourceSystemId) ?? false;
         const targetInZone =
           focusedZoneIds?.has(intg.destinationSystemId) ?? false;
@@ -3186,28 +3213,31 @@ function ArchitectureContent() {
           (targetInZone &&
             architectureLayout.centralIds.has(intg.sourceSystemId));
         const isZoneEdge = sourceInZone || targetInZone || isZoneToHubEdge;
-        const edgeOpacity = selectedId
-          ? isFocused && matchesEdgeFocus
-            ? 1
-            : 0.1
-          : selectedZoneKey
-            ? isZoneEdge && matchesMapMode
-              ? 0.9
-              : 0.08
-            : isFiltered && matchesMapMode
-              ? mapMode === "risk" && !isRiskEdge
-                ? 0.22
-                : 0.9
-              : mapMode === "risk"
-                ? 0.08
-                : 0.1;
+        const edgeOpacity = isHiddenEdge
+          ? 0.025
+          : selectedId
+            ? isFocused && matchesEdgeFocus
+              ? 1
+              : 0.1
+            : selectedZoneKey
+              ? isZoneEdge && matchesMapMode
+                ? 0.9
+                : 0.08
+              : isFiltered && matchesMapMode
+                ? mapMode === "risk" && !isRiskEdge
+                  ? 0.22
+                  : 0.9
+                : mapMode === "risk"
+                  ? 0.08
+                  : 0.1;
         return {
           id: intg._id,
           source: intg.sourceSystemId,
           target: intg.destinationSystemId,
           type: "glow",
-          label:
-            selectedId && isFocused
+          label: isHiddenEdge
+            ? undefined
+            : selectedId && isFocused
               ? `${intg.protocol} · ${
                   METHOD_META[intg.method]?.label ?? intg.method
                 }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
@@ -3228,7 +3258,7 @@ function ArchitectureContent() {
             strokeDasharray: !intg.isArchitectureCompliant ? "6,4" : undefined,
             opacity: edgeOpacity,
           },
-          animated: intg.method === "realtime",
+          animated: !isHiddenEdge && intg.method === "realtime",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: hc.color,
@@ -3246,6 +3276,8 @@ function ArchitectureContent() {
       edgeFocus,
       focusedZoneIds,
       architectureLayout.centralIds,
+      hiddenZoneKeys,
+      systemGroupMap,
     ],
   );
 
@@ -3324,11 +3356,32 @@ function ArchitectureContent() {
     setViewTab(tab);
     setSelectedId(null);
     setSelectedZoneKey(null);
+    setHiddenZoneKeys(new Set());
   };
 
   const handleSetSelectedZone = (zoneKey: SystemZoneKey) => {
+    if (hiddenZoneKeys.has(zoneKey)) return;
     setSelectedId(null);
     setSelectedZoneKey((current) => (current === zoneKey ? null : zoneKey));
+  };
+
+  const handleToggleZoneVisibility = (zoneKey: SystemZoneKey) => {
+    setHiddenZoneKeys((current) => {
+      const next = new Set(current);
+      if (next.has(zoneKey)) {
+        next.delete(zoneKey);
+      } else {
+        next.add(zoneKey);
+        if (selectedZoneKey === zoneKey) setSelectedZoneKey(null);
+        if (
+          selectedSystem &&
+          systemGroupMap.get(selectedSystem._id) === zoneKey
+        ) {
+          setSelectedId(null);
+        }
+      }
+      return next;
+    });
   };
 
   const hasMapFocus =
@@ -3337,7 +3390,8 @@ function ArchitectureContent() {
     filterType !== "all" ||
     filterHealth !== "all" ||
     edgeFocus !== "all" ||
-    mapMode !== "ecosystem";
+    mapMode !== "ecosystem" ||
+    hiddenZoneKeys.size > 0;
 
   const handleClearMapFocus = () => {
     setSelectedId(null);
@@ -3346,6 +3400,7 @@ function ArchitectureContent() {
     setFilterHealth("all");
     setEdgeFocus("all");
     setMapMode("ecosystem");
+    setHiddenZoneKeys(new Set());
   };
 
   if (rawSystems === undefined || rawIntegrations === undefined) {
@@ -3822,6 +3877,74 @@ function ArchitectureContent() {
                                     : "transparent",
                               }}
                             >
+                              {group.title.split(" & ")[0]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="mt-3 border-t border-slate-700/70 pt-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                          Ẩn/hiện cụm
+                        </span>
+                        {hiddenZoneKeys.size > 0 && (
+                          <button
+                            onClick={() => setHiddenZoneKeys(new Set())}
+                            className="text-[10px] font-medium text-sky-300 hover:text-sky-200"
+                          >
+                            Hiện tất cả
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => handleToggleZoneVisibility("core")}
+                          className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
+                          style={{
+                            borderColor: hiddenZoneKeys.has("core")
+                              ? "#475569"
+                              : "#a78bfa",
+                            color: hiddenZoneKeys.has("core")
+                              ? "#64748b"
+                              : "#ddd6fe",
+                            background: hiddenZoneKeys.has("core")
+                              ? "transparent"
+                              : "#a78bfa22",
+                            opacity: hiddenZoneKeys.has("core") ? 0.75 : 1,
+                          }}
+                        >
+                          {hiddenZoneKeys.has("core") ? "Ẩn" : "Hiện"} · Trung
+                          tâm
+                        </button>
+                        {(
+                          Object.entries(ECOSYSTEM_GROUPS) as [
+                            EcosystemGroupKey,
+                            EcosystemGroupConfig,
+                          ][]
+                        ).map(([key, group]) => {
+                          const hasZone = architectureLayout.zones.some(
+                            (zone) => zone.id === `zone-${key}`,
+                          );
+                          if (!hasZone) return null;
+                          const isHidden = hiddenZoneKeys.has(key);
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => handleToggleZoneVisibility(key)}
+                              className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
+                              style={{
+                                borderColor: isHidden
+                                  ? "#475569"
+                                  : group.accent,
+                                color: isHidden ? "#64748b" : "#f8fafc",
+                                background: isHidden
+                                  ? "transparent"
+                                  : `${group.accent}26`,
+                                opacity: isHidden ? 0.75 : 1,
+                              }}
+                            >
+                              {isHidden ? "Ẩn" : "Hiện"} ·{" "}
                               {group.title.split(" & ")[0]}
                             </button>
                           );
