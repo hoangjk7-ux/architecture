@@ -1256,9 +1256,9 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const rowGap = 36;
-  const stackGap = 28;
-  const colGap = 36;
+  const rowGap = 24;
+  const stackGap = 18;
+  const colGap = 22;
   const canvasLeft = 8;
   const topY = 28;
   const coreWidth = 360;
