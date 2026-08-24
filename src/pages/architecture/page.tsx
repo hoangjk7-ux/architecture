@@ -658,8 +658,8 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           height: "100%",
           border: `2px solid ${data.accent}`,
           borderRadius: 999,
-          background: `radial-gradient(circle at 50% 45%, ${data.accent}38 0%, ${data.accent}1f 38%, #06101fdd 70%)`,
-          boxShadow: `0 0 0 8px ${data.accent}16, 0 0 46px ${data.accent}66, inset 0 0 42px ${data.accent}38`,
+          background: `radial-gradient(circle at 50% 48%, ${data.accent}32 0%, ${data.accent}1a 36%, #06101fdd 68%)`,
+          boxShadow: `0 0 0 6px ${data.accent}14, 0 0 38px ${data.accent}55, inset 0 0 34px ${data.accent}32`,
           pointerEvents: "none",
           display: "flex",
           alignItems: "center",
@@ -695,7 +695,7 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            inset: 22,
+            inset: 20,
             borderRadius: 999,
             border: "1px solid rgba(103, 232, 249, 0.22)",
             boxShadow: "0 0 42px rgba(34, 211, 238, 0.25)",
@@ -704,21 +704,21 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            top: 20,
-            left: 46,
-            right: 46,
+            top: 16,
+            left: 52,
+            right: 52,
             zIndex: 1,
           }}
         >
           <div
             style={{
               display: "inline-block",
-              padding: "4px 10px",
+              padding: "3px 8px",
               borderRadius: 999,
               background: "#050b18cc",
               border: `1px solid ${data.accent}55`,
               color: "#e0f2fe",
-              fontSize: 12,
+              fontSize: 10,
               fontWeight: 900,
               lineHeight: 1.2,
               letterSpacing: 0.5,
@@ -732,22 +732,78 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
         <div
           style={{
             position: "absolute",
-            bottom: 22,
-            left: 52,
-            right: 52,
+            bottom: 14,
+            left: 48,
+            right: 48,
             zIndex: 1,
           }}
         >
           <div
             style={{
               color: "#c4b5fd",
-              fontSize: 9,
+              fontSize: 8,
               lineHeight: 1.35,
             }}
           >
             {data.subtitle}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (data.isPlaceholder) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          border: `1px solid ${data.accent}66`,
+          borderRadius: 18,
+          background: `linear-gradient(135deg, ${data.accent}12 0%, #071426b3 55%, #050b18cc 100%)`,
+          boxShadow: `inset 0 0 20px ${data.accent}10`,
+          pointerEvents: "none",
+          overflow: "hidden",
+          position: "relative",
+          padding: "10px 12px",
+        }}
+      >
+        <div
+          style={{
+            color: "#cbd5e1",
+            fontSize: 11,
+            fontWeight: 900,
+            lineHeight: 1.15,
+            letterSpacing: 0.35,
+            textTransform: "uppercase",
+          }}
+        >
+          {data.title}
+        </div>
+        <div
+          style={{
+            marginTop: 4,
+            color: data.accent,
+            fontSize: 8,
+            fontWeight: 800,
+            lineHeight: 1.2,
+          }}
+        >
+          Slot chưa có dữ liệu
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            right: 12,
+            bottom: 10,
+            width: 42,
+            height: 3,
+            borderRadius: 999,
+            background: data.accent,
+            boxShadow: `0 0 14px ${data.accent}`,
+            opacity: 0.85,
+          }}
+        />
       </div>
     );
   }
@@ -1298,14 +1354,14 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const rowGap = 10;
-  const stackGap = 10;
-  const colGap = 10;
-  const canvasLeft = 8;
-  const topY = 28;
-  const coreWidth = 300;
-  const centralGap = 104;
-  const centralHeight = Math.max(300, 86 + central.length * centralGap);
+  const quadrantGapX = 48;
+  const quadrantGapY = 28;
+  const stackGap = 8;
+  const canvasLeft = 10;
+  const canvasTop = 18;
+  const coreWidth = 270;
+  const centralGap = 96;
+  const centralHeight = Math.max(286, 96 + central.length * centralGap);
   const zoneSpecs = new globalThis.Map<
     EcosystemGroupKey,
     {
@@ -1322,7 +1378,7 @@ function layoutNodes(
     const config = ECOSYSTEM_GROUPS[key];
     const isPlaceholder = items.length === 0;
     const size = isPlaceholder
-      ? { columns: 1, rows: 1, width: 164, height: 84 }
+      ? { columns: 1, rows: 1, width: 142, height: 58 }
       : zoneSizeFor(items.length);
     zoneSpecs.set(key, {
       items,
@@ -1338,21 +1394,20 @@ function layoutNodes(
     zoneSpecs.get(key)?.height ?? 0;
   const zoneWidth = (key: EcosystemGroupKey) => zoneSpecs.get(key)?.width ?? 0;
   const maxZoneWidth = (keys: EcosystemGroupKey[]) =>
-    Math.max(...keys.map((key) => zoneWidth(key)), 184);
-
+    Math.max(...keys.map((key) => zoneWidth(key)), 168);
+  const leftKeys: EcosystemGroupKey[] = ["workspace", "platform", "pilot"];
+  const rightKeys: EcosystemGroupKey[] = ["learning", "automation", "legacy"];
+  const leftWidth = maxZoneWidth(leftKeys);
+  const rightWidth = maxZoneWidth(rightKeys);
   const topRowHeight = Math.max(
     zoneHeight("workspace"),
     zoneHeight("learning"),
-    0,
   );
-  const leftWidth = maxZoneWidth(["workspace", "platform", "pilot"]);
-  const rightWidth = maxZoneWidth(["learning", "automation", "legacy"]);
-  const leftX = canvasLeft + 10;
-  const coreX = leftX + leftWidth + colGap;
-  const rightX = coreX + coreWidth + colGap;
-  const topRowY = topY;
-  const coreY = topRowY + topRowHeight + rowGap;
-  const bottomRowY = coreY + centralHeight + rowGap;
+  const leftX = canvasLeft;
+  const coreX = leftX + leftWidth + quadrantGapX;
+  const rightX = coreX + coreWidth + quadrantGapX;
+  const coreY = canvasTop + topRowHeight + quadrantGapY;
+  const bottomRowY = coreY + centralHeight + quadrantGapY;
 
   const placeZone = (key: EcosystemGroupKey, x: number, y: number) => {
     const spec = zoneSpecs.get(key);
@@ -1397,8 +1452,18 @@ function layoutNodes(
     placeZone(key, x + (width - spec.width) / 2, y);
   };
 
-  placeInQuadrant("workspace", leftX, topRowY, leftWidth);
-  placeInQuadrant("learning", rightX, topRowY, rightWidth);
+  placeInQuadrant(
+    "workspace",
+    leftX,
+    canvasTop + topRowHeight - zoneHeight("workspace"),
+    leftWidth,
+  );
+  placeInQuadrant(
+    "learning",
+    rightX,
+    canvasTop + topRowHeight - zoneHeight("learning"),
+    rightWidth,
+  );
 
   const placeStack = (
     keys: EcosystemGroupKey[],
@@ -1415,22 +1480,24 @@ function layoutNodes(
     });
   };
 
-  const centerY = coreY + centralHeight / 2 - 45;
+  const centralBlockHeight = 86 + (central.length - 1) * centralGap;
+  const centralStartY =
+    coreY + Math.max(72, (centralHeight - centralBlockHeight) / 2 + 22);
   central.forEach((system, index) => {
     positions[system._id] = {
       x: coreX + (coreWidth - 172) / 2,
-      y: centerY - ((central.length - 1) * centralGap) / 2 + index * centralGap,
+      y: centralStartY + index * centralGap,
     };
   });
   zones.push({
     id: "zone-core",
-    title: "Hệ sinh thái kiến trúc hệ thống",
+    title: "Lõi dữ liệu & điều phối hệ thống",
     subtitle:
       central.length === 1
-        ? "Hub chính được chọn theo số kết nối, loại core và mức trọng yếu"
-        : `${central.length} hub chính được chọn theo số kết nối, loại core và mức trọng yếu`,
+        ? "Trung tâm dữ liệu, kết nối và điều phối các vệ tinh vận hành"
+        : `${central.length} hub trung tâm điều phối dữ liệu, kết nối và luồng vận hành`,
     x: coreX,
-    y: centerY - centralHeight / 2 + 45,
+    y: coreY,
     width: coreWidth,
     height: centralHeight,
     accent: "#a78bfa",
@@ -3351,7 +3418,7 @@ function ArchitectureContent() {
     () => new Set(),
   );
   const [showHelp, setShowHelp] = useState(false);
-  const [showQuickRead, setShowQuickRead] = useState(true);
+  const [showQuickRead, setShowQuickRead] = useState(false);
   // Imperative handle to the canvas instead of useReactFlow(), because the
   // toolbar/panels that need to trigger a fit live outside <ReactFlow>'s own
   // subtree (useReactFlow() only works inside it without a separate
@@ -3688,7 +3755,7 @@ function ArchitectureContent() {
                 ? mapMode === "risk" && !isRiskEdge
                   ? 0.22
                   : isDefaultOverview && !isRiskEdge
-                    ? 0.28
+                    ? 0.18
                     : 0.9
                 : mapMode === "risk"
                   ? 0.08
@@ -4349,7 +4416,7 @@ function ArchitectureContent() {
                     </Popover>
                   </div>
                   <div
-                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "w-[300px]" : ""}`}
+                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "max-h-[calc(100%-240px)] w-[270px] overflow-y-auto" : "w-[230px]"}`}
                   >
                     <button
                       onClick={() => setShowQuickRead((v) => !v)}
