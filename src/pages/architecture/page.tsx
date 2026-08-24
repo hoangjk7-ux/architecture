@@ -419,7 +419,12 @@ function SystemNode({ data }: NodeProps<NodeData>) {
       />
       <div
         style={{
-          background: meta.badge,
+          // In Risk lens, risk is the primary signal (border/background
+          // already encode it) — keeping the type badge's own color here
+          // too stacks a second, unrelated color meaning on the same card
+          // header (.ai/architecture-overview-ux-review.md, "Màu sắc đang
+          // gánh quá nhiều nghĩa"). Neutralize it so risk color dominates.
+          background: isRiskMode ? "#1e293b" : meta.badge,
           borderRadius: "8px 8px 0 0",
           padding: "3px 10px",
           display: "flex",
@@ -4412,11 +4417,22 @@ function ArchitectureContent() {
                   />
                   <MiniMap
                     nodeComponent={ArchitectureMiniMapNode}
-                    nodeColor={(node) =>
-                      TYPE_META[
-                        systems.find((s) => s._id === node.id)?.type ?? "core"
-                      ]?.badge ?? "#6366f1"
-                    }
+                    nodeColor={(node) => {
+                      const system = systems.find((s) => s._id === node.id);
+                      if (!system) return "#6366f1";
+                      // Match the lens: in Risk mode the map's primary
+                      // encoding is risk, not system type, so the MiniMap
+                      // should read the same way as the canvas
+                      // (.ai/architecture-overview-ux-review.md, "MiniMap
+                      // luôn theo system type").
+                      if (mapMode === "risk") {
+                        const worstHealth =
+                          integrationMetrics.get(system._id)?.worstHealth ??
+                          "unknown";
+                        return riskToneForSystem(system, worstHealth).color;
+                      }
+                      return TYPE_META[system.type]?.badge ?? "#6366f1";
+                    }}
                     style={{
                       background: "#0a1628",
                       border: "1px solid #1e293b",
