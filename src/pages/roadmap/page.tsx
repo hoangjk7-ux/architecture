@@ -49,9 +49,16 @@ const statusConfig = {
   },
 } as const;
 
-const levelOrder = ["initiative", "program", "project", "epic"] as const;
+const levelOrder = [
+  "initiative",
+  "program",
+  "project",
+  "epic",
+  "sprint",
+  "workstream",
+] as const;
 
-type RoadmapLevel = "initiative" | "program" | "project" | "epic";
+type RoadmapLevel = (typeof levelOrder)[number];
 type RoadmapStatus =
   | "not_started"
   | "in_progress"

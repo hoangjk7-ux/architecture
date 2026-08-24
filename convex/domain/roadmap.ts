@@ -6,13 +6,24 @@ import {
   requiredText,
 } from "./common";
 
-export type RoadmapLevel = "initiative" | "program" | "project" | "epic";
+export type RoadmapLevel =
+  | "initiative"
+  | "program"
+  | "project"
+  | "epic"
+  | "sprint"
+  | "workstream";
 
 const requiredParentLevel: Record<RoadmapLevel, RoadmapLevel | null> = {
   initiative: null,
   program: "initiative",
   project: "program",
   epic: "project",
+  // Sprint is a sibling of epic — both attach directly under a project, but
+  // represent different tracking styles (strategic epic vs. an imported
+  // execution sprint board). See convex/domain/roadmapImport.ts.
+  sprint: "project",
+  workstream: "sprint",
 };
 
 export type RoadmapInput = {

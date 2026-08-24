@@ -216,6 +216,11 @@ export default defineSchema({
       v.literal("program"),
       v.literal("project"),
       v.literal("epic"),
+      // Sibling of "epic" under "project" — execution-tracking granularity
+      // (sprint boards imported from external tools) rather than strategic
+      // portfolio granularity. See convex/domain/roadmap.ts.
+      v.literal("sprint"),
+      v.literal("workstream"),
     ),
     parentId: v.optional(v.id("roadmap_items")),
     status: v.union(

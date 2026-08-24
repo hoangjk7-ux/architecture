@@ -965,6 +965,100 @@ function worstHealthFor(sysId: string, integrations: Integration[]): string {
     "healthy",
   );
 }
+
+type RiskRecommendation = {
+  tone: "high" | "medium" | "low";
+  title: string;
+  detail: string;
+};
+
+function buildRiskRecommendations(
+  system: System,
+  connectedIntegrations: Integration[],
+): RiskRecommendation[] {
+  const worstHealth = worstHealthFor(system._id, connectedIntegrations);
+  const nonCompliant = connectedIntegrations.filter(
+    (integration) => !integration.isArchitectureCompliant,
+  );
+  const failingFlows = connectedIntegrations.filter((integration) =>
+    ["degraded", "down"].includes(integration.healthStatus),
+  );
+  const criticalFlows = connectedIntegrations.filter(
+    (integration) => integration.criticalLevel === "high",
+  );
+  const errorFlows = connectedIntegrations.filter(
+    (integration) => (integration.errorRate ?? 0) > 0,
+  );
+  const recommendations: RiskRecommendation[] = [];
+
+  if (system.riskLevel === "high" || worstHealth === "down") {
+    recommendations.push({
+      tone: "high",
+      title: "Ưu tiên xử lý trong phiên điều hành gần nhất",
+      detail:
+        "Đưa hệ thống vào danh sách theo dõi CTO, xác định owner chịu trách nhiệm và cập nhật ETA khắc phục.",
+    });
+  }
+
+  if (system.technicalDebtScore >= 70) {
+    recommendations.push({
+      tone: "high",
+      title: "Lập backlog giảm nợ kỹ thuật",
+      detail:
+        "Tách các hạng mục nâng cấp nền tảng, chuẩn hoá dữ liệu và loại bỏ phụ thuộc cũ trước khi mở rộng tính năng.",
+    });
+  } else if (system.technicalDebtScore >= 40) {
+    recommendations.push({
+      tone: "medium",
+      title: "Theo dõi nợ kỹ thuật theo quý",
+      detail:
+        "Giữ ngưỡng cảnh báo cho các module có xu hướng xuống cấp và rà soát chi phí duy trì.",
+    });
+  }
+
+  if (failingFlows.length > 0) {
+    recommendations.push({
+      tone: worstHealth === "down" ? "high" : "medium",
+      title: "Kiểm tra các luồng degraded/down",
+      detail: `${failingFlows.length} tích hợp đang có vấn đề sức khoẻ; ưu tiên luồng realtime hoặc luồng ảnh hưởng dữ liệu vận hành.`,
+    });
+  }
+
+  if (nonCompliant.length > 0) {
+    recommendations.push({
+      tone: "medium",
+      title: "Chuẩn hoá tích hợp chưa tuân thủ",
+      detail: `${nonCompliant.length} luồng chưa đạt chuẩn kiến trúc; cần rà lại protocol, ownership, logging và cơ chế retry.`,
+    });
+  }
+
+  if (criticalFlows.length > 0 && system.criticality === "high") {
+    recommendations.push({
+      tone: "medium",
+      title: "Xác nhận phương án dự phòng cho luồng critical",
+      detail: `${criticalFlows.length} luồng critical liên quan hệ thống trọng yếu; nên kiểm tra SLA, fallback và cảnh báo sự cố.`,
+    });
+  }
+
+  if (errorFlows.length > 0) {
+    recommendations.push({
+      tone: "medium",
+      title: "Giảm error rate của tích hợp",
+      detail: `${errorFlows.length} luồng đang ghi nhận lỗi; cần xem log đồng bộ, dữ liệu đầu vào và retry policy.`,
+    });
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push({
+      tone: "low",
+      title: "Duy trì trạng thái ổn định",
+      detail:
+        "Tiếp tục theo dõi health, chi phí và thay đổi module để tránh tích luỹ rủi ro âm thầm.",
+    });
+  }
+
+  return recommendations.slice(0, 5);
+}
 function layoutNodes(
   systems: System[],
   integrations: Integration[],
@@ -1555,9 +1649,21 @@ function DetailPanel({
   const [editingModule, setEditingModule] = useState<SystemModule | null>(null);
 
   const meta = TYPE_META[system.type] ?? TYPE_META.core;
-  const outbound = integrations.filter((i) => i.sourceSystemId === system._id);
-  const inbound = integrations.filter(
-    (i) => i.destinationSystemId === system._id,
+  const outbound = useMemo(
+    () => integrations.filter((i) => i.sourceSystemId === system._id),
+    [integrations, system._id],
+  );
+  const inbound = useMemo(
+    () => integrations.filter((i) => i.destinationSystemId === system._id),
+    [integrations, system._id],
+  );
+  const connectedSystemIntegrations = useMemo(
+    () => [...outbound, ...inbound],
+    [outbound, inbound],
+  );
+  const riskRecommendations = useMemo(
+    () => buildRiskRecommendations(system, connectedSystemIntegrations),
+    [system, connectedSystemIntegrations],
   );
   const [activeTab, setActiveTab] = useState<PanelTab>("modules");
 
@@ -1889,6 +1995,68 @@ function DetailPanel({
 
         {activeTab === "overview" && (
           <div className="space-y-4">
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                  <h3 className="text-xs font-semibold">
+                    Khuyến nghị xử lý
+                  </h3>
+                </div>
+                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                  {riskRecommendations.length} mục
+                </span>
+              </div>
+              <div className="space-y-2">
+                {riskRecommendations.map((item) => {
+                  const tone =
+                    item.tone === "high"
+                      ? {
+                          border: "#ef444444",
+                          bg: "#ef444414",
+                          color: "#fca5a5",
+                          Icon: XCircle,
+                        }
+                      : item.tone === "medium"
+                        ? {
+                            border: "#f59e0b44",
+                            bg: "#f59e0b14",
+                            color: "#fcd34d",
+                            Icon: AlertTriangle,
+                          }
+                        : {
+                            border: "#22c55e44",
+                            bg: "#22c55e12",
+                            color: "#86efac",
+                            Icon: CheckCircle2,
+                          };
+                  const Icon = tone.Icon;
+                  return (
+                    <div
+                      key={`${item.tone}-${item.title}`}
+                      className="rounded-md border p-2"
+                      style={{
+                        borderColor: tone.border,
+                        background: tone.bg,
+                      }}
+                    >
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <Icon
+                          className="h-3 w-3 shrink-0"
+                          style={{ color: tone.color }}
+                        />
+                        <span className="text-[11px] font-semibold">
+                          {item.title}
+                        </span>
+                      </div>
+                      <p className="pl-4 text-[10px] leading-relaxed text-muted-foreground">
+                        {item.detail}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {[
                 {
@@ -3113,6 +3281,23 @@ function ArchitectureContent() {
     setSelectedZoneKey((current) => (current === zoneKey ? null : zoneKey));
   };
 
+  const hasMapFocus =
+    selectedId !== null ||
+    selectedZoneKey !== null ||
+    filterType !== "all" ||
+    filterHealth !== "all" ||
+    edgeFocus !== "all" ||
+    mapMode !== "ecosystem";
+
+  const handleClearMapFocus = () => {
+    setSelectedId(null);
+    setSelectedZoneKey(null);
+    setFilterType("all");
+    setFilterHealth("all");
+    setEdgeFocus("all");
+    setMapMode("ecosystem");
+  };
+
   if (rawSystems === undefined || rawIntegrations === undefined) {
     return (
       <div className="p-6">
@@ -3276,6 +3461,14 @@ function ArchitectureContent() {
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border border-orange-400/40 text-orange-200 hover:text-orange-100 cursor-pointer transition-colors"
               >
                 <X className="h-3 w-3" /> Xoá cụm
+              </button>
+            )}
+            {hasMapFocus && (
+              <button
+                onClick={handleClearMapFocus}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border border-slate-500/50 bg-slate-900/60 text-slate-200 hover:text-white cursor-pointer transition-colors"
+              >
+                <X className="h-3 w-3" /> Xoá tất cả
               </button>
             )}
           </div>

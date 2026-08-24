@@ -87,6 +87,8 @@ const roadmapArgs = {
     v.literal("program"),
     v.literal("project"),
     v.literal("epic"),
+    v.literal("sprint"),
+    v.literal("workstream"),
   ),
   parentId: v.optional(v.id("roadmap_items")),
   status: v.union(
