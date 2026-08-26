@@ -914,6 +914,13 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
               fontSize: 8,
               fontWeight: data.isPlaceholder ? 800 : 500,
               lineHeight: 1.2,
+              // Same reasoning as the default zone template: bound subtitle
+              // height so a long subtitle in a narrow compact-mode zone
+              // can't overlap the node grid below it.
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
             }}
           >
             {data.isPlaceholder ? "Slot chưa có dữ liệu" : data.subtitle}
@@ -1030,6 +1037,16 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           fontSize: 10,
           lineHeight: 1.35,
           maxWidth: 300,
+          // Narrow zones (e.g. a 1-column "Pilot" zone with a long
+          // subtitle) can wrap to 3+ lines, which the fixed header space
+          // above the node grid (placeGrid's y offset / zoneSizeFor's
+          // height) doesn't budget for — the text then overlaps the first
+          // row of system cards. Cap to 2 lines so subtitle height is
+          // bounded regardless of zone width or text length.
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
         }}
       >
         {data.subtitle}
@@ -1325,7 +1342,10 @@ function placeGrid(
     const row = Math.floor(index / columns);
     positions[system._id] = {
       x: x + 16 + col * (nodeW + gapX),
-      y: y + (isCompressed ? 48 : 56) + row * (nodeH + gapY),
+      // Header budget for title (1 line) + subtitle (clamped to 2 lines,
+      // see ZoneNode) — a narrow zone with a long subtitle used to wrap to
+      // 3+ lines and overlap this first node row (58/48 wasn't enough).
+      y: y + (isCompressed ? 58 : 70) + row * (nodeH + gapY),
     };
   });
 }
@@ -1355,7 +1375,7 @@ function zoneSizeFor(count: number, isCompressed = false) {
       columns,
       rows,
       width: Math.max(156, 16 + columns * 112 + (columns - 1) * 10 + 20),
-      height: Math.max(104, 48 + rows * 50 + (rows - 1) * 8 + 16),
+      height: Math.max(114, 58 + rows * 50 + (rows - 1) * 8 + 16),
     };
   }
   const width =
@@ -1364,7 +1384,7 @@ function zoneSizeFor(count: number, isCompressed = false) {
     columns,
     rows,
     width,
-    height: Math.max(150, 64 + rows * 86 + (rows - 1) * 12 + 18),
+    height: Math.max(160, 70 + rows * 86 + (rows - 1) * 12 + 18),
   };
 }
 
