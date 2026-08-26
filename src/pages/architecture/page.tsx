@@ -1924,9 +1924,6 @@ function layoutNodes(
     });
   };
 
-  placeZone("workspace", leftX, coreY - zoneHeight("workspace") - quadrantGapY);
-  placeZone("learning", rightX, coreY - zoneHeight("learning") - quadrantGapY);
-
   const placeRow = (keys: EcosystemGroupKey[], centerX: number, y: number) => {
     const specs = keys
       .map((key) => zoneSpecs.get(key))
@@ -1943,6 +1940,78 @@ function layoutNodes(
       cursorX += spec.width + quadrantGapX;
     });
   };
+
+  const coreCenterX = coreX + coreWidth / 2;
+
+  if (isCompressed) {
+    const orbitSlots: Record<
+      EcosystemGroupKey,
+      { x: number; y: number; align: "left" | "right" | "center" }
+    > = {
+      workspace: {
+        x: coreX - quadrantGapX - zoneWidth("workspace"),
+        y: coreY + 16,
+        align: "left",
+      },
+      learning: {
+        x: coreX + coreWidth + quadrantGapX,
+        y: coreY + 16,
+        align: "right",
+      },
+      platform: {
+        x: coreX - quadrantGapX - zoneWidth("platform"),
+        y: coreY + centralHeight - zoneHeight("platform") - 8,
+        align: "left",
+      },
+      pilot: {
+        x: coreCenterX - zoneWidth("pilot") - 18,
+        y: coreY + centralHeight + quadrantGapY,
+        align: "center",
+      },
+      automation: {
+        x: coreCenterX + 18,
+        y: coreY + centralHeight + quadrantGapY,
+        align: "center",
+      },
+      legacy: {
+        x: coreX + coreWidth + quadrantGapX,
+        y: coreY + centralHeight - zoneHeight("legacy") - 8,
+        align: "right",
+      },
+    };
+
+    (
+      [
+        "workspace",
+        "learning",
+        "platform",
+        "legacy",
+        "pilot",
+        "automation",
+      ] as EcosystemGroupKey[]
+    ).forEach((key) => {
+      if (!zoneSpecs.has(key)) return;
+      const slot = orbitSlots[key];
+      const fallbackX =
+        slot.align === "left"
+          ? coreX - quadrantGapX - zoneWidth(key)
+          : slot.align === "right"
+            ? coreX + coreWidth + quadrantGapX
+            : coreCenterX - zoneWidth(key) / 2;
+      placeZone(key, Number.isFinite(slot.x) ? slot.x : fallbackX, slot.y);
+    });
+  } else {
+    placeZone(
+      "workspace",
+      leftX,
+      coreY - zoneHeight("workspace") - quadrantGapY,
+    );
+    placeZone(
+      "learning",
+      rightX,
+      coreY - zoneHeight("learning") - quadrantGapY,
+    );
+  }
 
   const centralBlockHeight =
     (isCompressed ? 50 : 86) + (central.length - 1) * centralGap;
@@ -1971,11 +2040,13 @@ function layoutNodes(
     accent: "#a78bfa",
     icon: Share2,
   });
-  placeRow(
-    ["platform", "pilot", "automation", "legacy"],
-    coreX + coreWidth / 2,
-    bottomRowY,
-  );
+  if (!isCompressed) {
+    placeRow(
+      ["platform", "pilot", "automation", "legacy"],
+      coreX + coreWidth / 2,
+      bottomRowY,
+    );
+  }
 
   return {
     positions,
