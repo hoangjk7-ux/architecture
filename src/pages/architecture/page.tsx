@@ -1554,8 +1554,13 @@ function layoutNodes(
   });
 
   const zones: ArchitectureZone[] = [];
-  const quadrantGapX = isCompressed ? 32 : 36;
-  const quadrantGapY = isCompressed ? 18 : 24;
+  // Distance from each satellite zone (workspace/learning/platform+pilot/
+  // automation+legacy) to the central core — shared by all four so tightening
+  // it moves them in lockstep instead of only the one someone happens to be
+  // looking at (feedback: workspace's own card design is right, but its gap
+  // to the core read as too far, and the same gap drives the other three).
+  const quadrantGapX = isCompressed ? 20 : 22;
+  const quadrantGapY = isCompressed ? 10 : 14;
   const stackGap = isCompressed ? 6 : 8;
   const canvasLeft = 0;
   const coreWidth = isCompressed ? 230 : 252;
