@@ -897,13 +897,19 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           <div
             style={{
               color: data.isPlaceholder ? "#cbd5e1" : "#f8fafc",
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 900,
               lineHeight: 1.1,
-              letterSpacing: 0.35,
+              letterSpacing: 0.3,
               textTransform: "uppercase",
               textShadow: `0 0 12px ${data.accent}55`,
+              // See the default zone template for why this is forced to
+              // one line instead of wrapping.
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
+            title={data.title}
           >
             {data.title}
           </div>
@@ -914,13 +920,9 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
               fontSize: 8,
               fontWeight: data.isPlaceholder ? 800 : 500,
               lineHeight: 1.2,
-              // Same reasoning as the default zone template: bound subtitle
-              // height so a long subtitle in a narrow compact-mode zone
-              // can't overlap the node grid below it.
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
+              // No clamp: zoneHeaderHeight sizes this zone's header from
+              // this exact subtitle text, so it already has room to wrap
+              // in full — see the default zone template above.
             }}
           >
             {data.isPlaceholder ? "Slot chưa có dữ liệu" : data.subtitle}
@@ -1019,14 +1021,21 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
     >
       <div
         style={{
-          padding: "16px 18px 8px",
+          padding: "14px 18px 6px",
           color: data.isPlaceholder ? "#94a3b8" : "#f8fafc",
-          fontSize: 15,
+          fontSize: 12,
           fontWeight: 900,
-          letterSpacing: 0.4,
+          letterSpacing: 0.3,
           textTransform: "uppercase",
           textShadow: `0 0 14px ${data.accent}66`,
+          // Forced to a single line (zoneSizeFor widens narrow zones to
+          // fit realistic titles at this size) — ellipsis is only a
+          // fallback for an unexpectedly long title, not the normal case.
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
+        title={data.title}
       >
         {data.title}
       </div>
@@ -1036,17 +1045,11 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           color: "#94a3b8",
           fontSize: 10,
           lineHeight: 1.35,
-          maxWidth: 300,
-          // Narrow zones (e.g. a 1-column "Pilot" zone with a long
-          // subtitle) can wrap to 3+ lines, which the fixed header space
-          // above the node grid (placeGrid's y offset / zoneSizeFor's
-          // height) doesn't budget for — the text then overlaps the first
-          // row of system cards. Cap to 2 lines so subtitle height is
-          // bounded regardless of zone width or text length.
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
+          // No clamp: the zone's header space is sized per-zone from this
+          // exact text by zoneHeaderHeight, so it wraps to however many
+          // lines it needs without overlapping the node grid below —
+          // truncating it here would just hide information that already
+          // has room to be shown in full.
         }}
       >
         {data.subtitle}
@@ -1325,13 +1328,53 @@ function classifyEcosystemGroup(system: System): EcosystemGroupKey {
   return "workspace";
 }
 
+// Rough per-character width for the small UI fonts used in zone cards
+// (mixed Vietnamese diacritics, no canvas text measurement available at
+// layout time). Calibrated against a real render: the "Học thuật & Trải
+// nghiệm" subtitle (10px font) wrapped at ~28 characters inside a ~148px
+// content box, i.e. ~5.3px/char.
+function estimateWrappedLines(
+  text: string,
+  contentWidthPx: number,
+  avgCharWidthPx: number,
+): number {
+  if (!text) return 0;
+  const charsPerLine = Math.max(1, Math.floor(contentWidthPx / avgCharWidthPx));
+  return Math.max(1, Math.ceil(text.length / charsPerLine));
+}
+
+// Zone title is forced to a single line by CSS (nowrap + ellipsis
+// fallback — see ZoneNode), so its header contribution is fixed. Subtitle
+// is left to wrap naturally, so its contribution must be computed from
+// the actual text length — a fixed constant either wastes space for a
+// short subtitle or (as reported: subtitle text overlapping the node
+// grid in "Học thuật & Trải nghiệm") isn't enough for a long one in a
+// narrow zone.
+function zoneHeaderHeight(
+  subtitle: string,
+  contentWidthPx: number,
+  isCompressed: boolean,
+): number {
+  const titleBlock = isCompressed ? 30 : 42;
+  const subtitleFontPx = isCompressed ? 8 : 10;
+  const subtitleLineHeightPx = subtitleFontPx * 1.35;
+  const avgCharWidthPx = subtitleFontPx * 0.53;
+  const subtitleLines = estimateWrappedLines(
+    subtitle,
+    contentWidthPx,
+    avgCharWidthPx,
+  );
+  return Math.ceil(titleBlock + subtitleLines * subtitleLineHeightPx + 8);
+}
+
 function placeGrid(
   items: System[],
   x: number,
   y: number,
   columns: number,
   positions: Record<string, { x: number; y: number }>,
-  isCompressed = false,
+  isCompressed: boolean,
+  headerOffset: number,
 ) {
   const nodeW = isCompressed ? 112 : 146;
   const nodeH = isCompressed ? 50 : 86;
@@ -1342,10 +1385,7 @@ function placeGrid(
     const row = Math.floor(index / columns);
     positions[system._id] = {
       x: x + 16 + col * (nodeW + gapX),
-      // Header budget for title (1 line) + subtitle (clamped to 2 lines,
-      // see ZoneNode) — a narrow zone with a long subtitle used to wrap to
-      // 3+ lines and overlap this first node row (58/48 wasn't enough).
-      y: y + (isCompressed ? 58 : 70) + row * (nodeH + gapY),
+      y: y + headerOffset + row * (nodeH + gapY),
     };
   });
 }
@@ -1371,20 +1411,34 @@ function zoneSizeFor(count: number, isCompressed = false) {
       : Math.min(3, Math.ceil(Math.sqrt(count)));
   const rows = Math.ceil(count / columns);
   if (isCompressed) {
+    // 1-column zones are widened a bit past what the node grid itself
+    // needs so a short-ish title (e.g. "Học thuật & Trải nghiệm") still
+    // fits on the single line CSS now forces it to (see ZoneNode) —
+    // otherwise it either wraps (the reported bug) or has to shrink to an
+    // illegibly small font.
+    const width =
+      columns === 1
+        ? 240
+        : Math.max(240, 16 + columns * 112 + (columns - 1) * 10 + 20);
     return {
       columns,
       rows,
-      width: Math.max(156, 16 + columns * 112 + (columns - 1) * 10 + 20),
-      height: Math.max(114, 58 + rows * 50 + (rows - 1) * 8 + 16),
+      width,
+      // Grid portion only — the header (title + subtitle) is sized
+      // separately per zone by zoneHeaderHeight, since it depends on the
+      // actual subtitle text length, not just the system count.
+      gridHeight: Math.max(66, rows * 50 + (rows - 1) * 8 + 16),
     };
   }
   const width =
-    columns === 1 ? 184 : 16 + columns * 146 + (columns - 1) * 12 + 24;
+    columns === 1
+      ? 300
+      : Math.max(300, 16 + columns * 146 + (columns - 1) * 12 + 24);
   return {
     columns,
     rows,
     width,
-    height: Math.max(160, 70 + rows * 86 + (rows - 1) * 12 + 18),
+    gridHeight: Math.max(90, rows * 86 + (rows - 1) * 12 + 18),
   };
 }
 
@@ -1597,6 +1651,8 @@ function layoutNodes(
       columns: number;
       width: number;
       height: number;
+      headerOffset: number;
+      subtitle: string;
       isPlaceholder: boolean;
     }
   >();
@@ -1604,21 +1660,48 @@ function layoutNodes(
   groups.forEach((items, key) => {
     const config = ECOSYSTEM_GROUPS[key];
     const isPlaceholder = items.length === 0;
-    const size = isPlaceholder
-      ? {
-          columns: 1,
-          rows: 1,
-          width: isCompressed ? 136 : 142,
-          height: isCompressed ? 54 : 58,
-        }
-      : zoneSizeFor(items.length, isCompressed);
+    if (isPlaceholder) {
+      zoneSpecs.set(key, {
+        items,
+        config,
+        columns: 1,
+        width: isCompressed ? 136 : 142,
+        height: isCompressed ? 54 : 58,
+        headerOffset: 0,
+        subtitle: "Chưa có hệ thống",
+        isPlaceholder: true,
+      });
+      return;
+    }
+    const size = zoneSizeFor(items.length, isCompressed);
+    const issueCount = items.filter((system) =>
+      ["degraded", "down"].includes(
+        metrics.get(system._id)?.worstHealth ?? "unknown",
+      ),
+    ).length;
+    const highDebtCount = items.filter(
+      (system) => system.technicalDebtScore >= 70,
+    ).length;
+    const statusNotes = [
+      `${items.length} hệ thống`,
+      issueCount ? `${issueCount} cần chú ý` : null,
+      highDebtCount ? `${highDebtCount} nợ kỹ thuật cao` : null,
+    ].filter(Boolean);
+    const subtitle = `${statusNotes.join(" · ")} · ${config.subtitle}`;
+    // Subtitle's real length decides the header block's height (see
+    // zoneHeaderHeight) — content width is the zone's inner width minus
+    // its left+right padding (18px each side, 14px in compact mode).
+    const contentWidth = size.width - (isCompressed ? 28 : 36);
+    const headerOffset = zoneHeaderHeight(subtitle, contentWidth, isCompressed);
     zoneSpecs.set(key, {
       items,
       config,
       columns: size.columns,
       width: size.width,
-      height: size.height,
-      isPlaceholder,
+      height: headerOffset + size.gridHeight,
+      headerOffset,
+      subtitle,
+      isPlaceholder: false,
     });
   });
 
@@ -1639,26 +1722,23 @@ function layoutNodes(
   const placeZone = (key: EcosystemGroupKey, x: number, y: number) => {
     const spec = zoneSpecs.get(key);
     if (!spec) return;
-    const issueCount = spec.items.filter((system) =>
-      ["degraded", "down"].includes(
-        metrics.get(system._id)?.worstHealth ?? "unknown",
-      ),
-    ).length;
-    const highDebtCount = spec.items.filter(
-      (system) => system.technicalDebtScore >= 70,
-    ).length;
-    const statusNotes = [
-      spec.isPlaceholder ? "Chưa có hệ thống" : `${spec.items.length} hệ thống`,
-      issueCount ? `${issueCount} cần chú ý` : null,
-      highDebtCount ? `${highDebtCount} nợ kỹ thuật cao` : null,
-    ].filter(Boolean);
     if (!spec.isPlaceholder) {
-      placeGrid(spec.items, x, y, spec.columns, positions, isCompressed);
+      placeGrid(
+        spec.items,
+        x,
+        y,
+        spec.columns,
+        positions,
+        isCompressed,
+        spec.headerOffset,
+      );
     }
     zones.push({
       id: `zone-${key}`,
       title: spec.config.title,
-      subtitle: `${statusNotes.join(" · ")} · ${spec.config.subtitle}`,
+      subtitle: spec.isPlaceholder
+        ? `${spec.subtitle} · ${spec.config.subtitle}`
+        : spec.subtitle,
       x,
       y,
       width: spec.width,
