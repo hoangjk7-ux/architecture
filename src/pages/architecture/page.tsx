@@ -1822,6 +1822,7 @@ function layoutNodes(
   groups.forEach((items, key) => {
     const config = ECOSYSTEM_GROUPS[key];
     const isPlaceholder = items.length === 0;
+    if (isCompressed && isPlaceholder) return;
     if (isPlaceholder) {
       zoneSpecs.set(key, {
         items,
