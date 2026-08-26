@@ -82,6 +82,12 @@ import {
   Maximize2,
   ChevronDown,
   ChevronUp,
+  GraduationCap,
+  Cog,
+  Rocket,
+  ArrowLeftRight,
+  Share2,
+  type LucideIcon,
 } from "lucide-react";
 import SystemFlowSVG from "../flow-diagram/_components/SystemFlowSVG.tsx";
 import GanttChart from "../flow-diagram/_components/GanttChart.tsx";
@@ -249,6 +255,8 @@ interface ZoneNodeData {
   isCore: boolean;
   isPlaceholder: boolean;
   isMiniZone: boolean;
+  icon?: LucideIcon;
+  examples?: string[];
 }
 
 type ArchitectureNodeData = NodeData | ZoneNodeData;
@@ -871,7 +879,138 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
     );
   }
 
+  if (data.isPlaceholder) {
+    // Checked before isMiniZone: the default (no selection) view *is*
+    // compact mode (see isOverviewCompressed), so an empty zone's rich
+    // "here's what belongs here" card must render there too, not only
+    // once a user has drilled into something. One shared template for
+    // both densities — only the fixed width/height differs (zoneSizeFor).
+    const Icon = data.icon;
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          border: `1px solid ${data.accent}66`,
+          borderRadius: 18,
+          background: `linear-gradient(135deg, ${data.accent}12 0%, #071426b3 55%, #050b18cc 100%)`,
+          boxShadow: `inset 0 0 20px ${data.accent}10`,
+          pointerEvents: "none",
+          overflow: "hidden",
+          position: "relative",
+          padding: "14px 16px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {Icon && (
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 9,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: `${data.accent}22`,
+                border: `1px solid ${data.accent}55`,
+                color: data.accent,
+                flexShrink: 0,
+              }}
+            >
+              <Icon size={15} />
+            </div>
+          )}
+          <div
+            style={{
+              color: "#cbd5e1",
+              fontSize: 12,
+              fontWeight: 900,
+              lineHeight: 1.15,
+              letterSpacing: 0.3,
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            title={data.title}
+          >
+            {data.title}
+          </div>
+        </div>
+        <div
+          style={{
+            marginTop: 6,
+            color: data.accent,
+            fontSize: 9,
+            fontWeight: 800,
+            lineHeight: 1.2,
+          }}
+        >
+          Slot chưa có dữ liệu
+        </div>
+        <div
+          style={{
+            marginTop: 8,
+            marginBottom: 10,
+            height: 3,
+            borderRadius: 999,
+            background: `${data.accent}33`,
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: "0 65% 0 0",
+              borderRadius: 999,
+              background: data.accent,
+              boxShadow: `0 0 12px ${data.accent}`,
+            }}
+          />
+        </div>
+        {data.examples && data.examples.length > 0 && (
+          <ul
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 5,
+            }}
+          >
+            {data.examples.map((example) => (
+              <li
+                key={example}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 10,
+                  color: "#94a3b8",
+                }}
+              >
+                <span
+                  style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 999,
+                    background: data.accent,
+                    flexShrink: 0,
+                  }}
+                />
+                {example}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
   if (data.isMiniZone) {
+    const Icon = data.icon;
     return (
       <div
         style={{
@@ -892,40 +1031,63 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
             top: 10,
             left: 14,
             right: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
           }}
         >
-          <div
-            style={{
-              color: data.isPlaceholder ? "#cbd5e1" : "#f8fafc",
-              fontSize: 10,
-              fontWeight: 900,
-              lineHeight: 1.1,
-              letterSpacing: 0.3,
-              textTransform: "uppercase",
-              textShadow: `0 0 12px ${data.accent}55`,
-              // See the default zone template for why this is forced to
-              // one line instead of wrapping.
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-            title={data.title}
-          >
-            {data.title}
-          </div>
-          <div
-            style={{
-              marginTop: 3,
-              color: data.isPlaceholder ? data.accent : "#94a3b8",
-              fontSize: 8,
-              fontWeight: data.isPlaceholder ? 800 : 500,
-              lineHeight: 1.2,
-              // No clamp: zoneHeaderHeight sizes this zone's header from
-              // this exact subtitle text, so it already has room to wrap
-              // in full — see the default zone template above.
-            }}
-          >
-            {data.isPlaceholder ? "Slot chưa có dữ liệu" : data.subtitle}
+          {Icon && (
+            <div
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 8,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: `${data.accent}22`,
+                border: `1px solid ${data.accent}55`,
+                color: data.accent,
+                flexShrink: 0,
+              }}
+            >
+              <Icon size={12} />
+            </div>
+          )}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                color: "#f8fafc",
+                fontSize: 10,
+                fontWeight: 900,
+                lineHeight: 1.1,
+                letterSpacing: 0.3,
+                textTransform: "uppercase",
+                textShadow: `0 0 12px ${data.accent}55`,
+                // See the default zone template for why this is forced to
+                // one line instead of wrapping.
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              title={data.title}
+            >
+              {data.title}
+            </div>
+            <div
+              style={{
+                marginTop: 3,
+                color: "#94a3b8",
+                fontSize: 8,
+                fontWeight: 500,
+                lineHeight: 1.2,
+                // No clamp: zoneHeaderHeight sizes this zone's header from
+                // this exact subtitle text, so it already has room to wrap
+                // in full — see the default zone template above.
+              }}
+            >
+              {data.subtitle}
+            </div>
           </div>
         </div>
         <div
@@ -939,62 +1101,6 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
             background: data.accent,
             boxShadow: `0 0 14px ${data.accent}`,
             opacity: 0.7,
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (data.isPlaceholder) {
-    return (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          border: `1px solid ${data.accent}66`,
-          borderRadius: 18,
-          background: `linear-gradient(135deg, ${data.accent}12 0%, #071426b3 55%, #050b18cc 100%)`,
-          boxShadow: `inset 0 0 20px ${data.accent}10`,
-          pointerEvents: "none",
-          overflow: "hidden",
-          position: "relative",
-          padding: "10px 12px",
-        }}
-      >
-        <div
-          style={{
-            color: "#cbd5e1",
-            fontSize: 11,
-            fontWeight: 900,
-            lineHeight: 1.15,
-            letterSpacing: 0.35,
-            textTransform: "uppercase",
-          }}
-        >
-          {data.title}
-        </div>
-        <div
-          style={{
-            marginTop: 4,
-            color: data.accent,
-            fontSize: 8,
-            fontWeight: 800,
-            lineHeight: 1.2,
-          }}
-        >
-          Slot chưa có dữ liệu
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            right: 12,
-            bottom: 10,
-            width: 42,
-            height: 3,
-            borderRadius: 999,
-            background: data.accent,
-            boxShadow: `0 0 14px ${data.accent}`,
-            opacity: 0.85,
           }}
         />
       </div>
@@ -1022,22 +1128,50 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
       <div
         style={{
           padding: "14px 18px 6px",
-          color: data.isPlaceholder ? "#94a3b8" : "#f8fafc",
-          fontSize: 12,
-          fontWeight: 900,
-          letterSpacing: 0.3,
-          textTransform: "uppercase",
-          textShadow: `0 0 14px ${data.accent}66`,
-          // Forced to a single line (zoneSizeFor widens narrow zones to
-          // fit realistic titles at this size) — ellipsis is only a
-          // fallback for an unexpectedly long title, not the normal case.
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          minWidth: 0,
         }}
-        title={data.title}
       >
-        {data.title}
+        {data.icon && (
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: `${data.accent}22`,
+              border: `1px solid ${data.accent}55`,
+              color: data.accent,
+              flexShrink: 0,
+            }}
+          >
+            <data.icon size={17} />
+          </div>
+        )}
+        <div
+          style={{
+            color: data.isPlaceholder ? "#94a3b8" : "#f8fafc",
+            fontSize: 12,
+            fontWeight: 900,
+            letterSpacing: 0.3,
+            textTransform: "uppercase",
+            textShadow: `0 0 14px ${data.accent}66`,
+            minWidth: 0,
+            // Forced to a single line (zoneSizeFor widens narrow zones to
+            // fit realistic titles at this size) — ellipsis is only a
+            // fallback for an unexpectedly long title, not the normal case.
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+          title={data.title}
+        >
+          {data.title}
+        </div>
       </div>
       <div
         style={{
@@ -1231,6 +1365,8 @@ type ArchitectureZone = {
   height: number;
   accent: string;
   isPlaceholder?: boolean;
+  icon?: LucideIcon;
+  examples?: string[];
 };
 
 type ArchitectureLayout = {
@@ -1255,6 +1391,11 @@ type EcosystemGroupConfig = {
   title: string;
   subtitle: string;
   accent: string;
+  icon: LucideIcon;
+  // Illustrative examples shown on an empty zone's placeholder card so
+  // "chưa có hệ thống" still communicates what belongs in this bucket,
+  // instead of a bare "no data" box.
+  examples: string[];
 };
 
 const ECOSYSTEM_GROUPS: Record<EcosystemGroupKey, EcosystemGroupConfig> = {
@@ -1262,31 +1403,53 @@ const ECOSYSTEM_GROUPS: Record<EcosystemGroupKey, EcosystemGroupConfig> = {
     title: "Vận hành & Workspace",
     subtitle: "ERP, CRM, HR, tài chính, cổng nội bộ và công cụ tác nghiệp",
     accent: "#22c55e",
+    icon: Users,
+    examples: ["ERP", "CRM", "HRM", "Tài chính - Kế toán"],
   },
   learning: {
     title: "Học thuật & Trải nghiệm",
     subtitle: "SIS, LMS, tuyển sinh, phụ huynh, học sinh và dịch vụ trường",
     accent: "#38bdf8",
+    icon: GraduationCap,
+    examples: ["SIS", "LMS", "Tuyển sinh", "Cổng phụ huynh"],
   },
   automation: {
     title: "Tích hợp & Tự động hoá",
     subtitle: "API, workflow, event, đồng bộ dữ liệu và tác vụ tự động",
     accent: "#f97316",
+    icon: Cog,
+    examples: [
+      "iPaaS / Automation",
+      "RPA / Workflow",
+      "Event & Notification",
+      "API Gateway",
+    ],
   },
   platform: {
     title: "Dữ liệu & Nền tảng",
     subtitle: "BI, data, identity, cloud, database và hạ tầng dùng chung",
     accent: "#8b5cf6",
+    icon: Database,
+    examples: [
+      "Data Lake",
+      "Data Warehouse",
+      "Analytics & BI",
+      "AI Foundation",
+    ],
   },
   pilot: {
     title: "Pilot / thử nghiệm",
     subtitle: "Sáng kiến đang kiểm chứng trước khi đưa vào lõi vận hành",
     accent: "#3b82f6",
+    icon: Rocket,
+    examples: ["Sáng kiến mới", "PoC", "Đánh giá nhà cung cấp"],
   },
   legacy: {
     title: "Legacy / chuyển đổi",
     subtitle: "Hệ thống nợ kỹ thuật, sunset hoặc cần tách khỏi lõi",
     accent: "#f59e0b",
+    icon: ArrowLeftRight,
+    examples: ["Legacy System", "Migration", "Data Adapter", "Decommission"],
   },
 };
 
@@ -1635,7 +1798,6 @@ function layoutNodes(
   // to the core read as too far, and the same gap drives the other three).
   const quadrantGapX = isCompressed ? 20 : 22;
   const quadrantGapY = isCompressed ? 10 : 14;
-  const stackGap = isCompressed ? 6 : 8;
   const canvasLeft = 0;
   const coreWidth = isCompressed ? 230 : 252;
   const coreY = isCompressed ? 214 : 292;
@@ -1665,8 +1827,14 @@ function layoutNodes(
         items,
         config,
         columns: 1,
-        width: isCompressed ? 136 : 142,
-        height: isCompressed ? 54 : 58,
+        // Matches the real (non-empty) 1-column zone width so an empty
+        // zone doesn't look out of place sitting next to one with systems
+        // in the same bottom row. Height budgets for icon+title, subtitle,
+        // the divider bar and up to 4 example bullets (see
+        // ECOSYSTEM_GROUPS[key].examples, rendered in the isPlaceholder
+        // branch of ZoneNode).
+        width: isCompressed ? 240 : 300,
+        height: isCompressed ? 150 : 178,
         headerOffset: 0,
         subtitle: "Chưa có hệ thống",
         isPlaceholder: true,
@@ -1710,10 +1878,15 @@ function layoutNodes(
   const zoneWidth = (key: EcosystemGroupKey) => zoneSpecs.get(key)?.width ?? 0;
   const maxZoneWidth = (keys: EcosystemGroupKey[]) =>
     Math.max(...keys.map((key) => zoneWidth(key)), isCompressed ? 148 : 168);
-  const leftKeys: EcosystemGroupKey[] = ["workspace", "platform", "pilot"];
-  const rightKeys: EcosystemGroupKey[] = ["learning", "automation", "legacy"];
-  const leftWidth = maxZoneWidth(leftKeys);
-  const rightWidth = maxZoneWidth(rightKeys);
+  // Reference layout (see .ai/ screenshot feedback): workspace top-left,
+  // learning top-right, core centered between/below them, and the
+  // remaining four groups (platform/pilot/automation/legacy) in a single
+  // horizontal row under the core — not stacked in two side columns like
+  // before. The row is centered on the core's own horizontal center so it
+  // reads as "everything else feeds the hub", and is free to span wider
+  // than the core since it usually holds more zones than either top slot.
+  const leftWidth = maxZoneWidth(["workspace"]);
+  const rightWidth = maxZoneWidth(["learning"]);
   const leftX = canvasLeft;
   const coreX = leftX + leftWidth + quadrantGapX;
   const rightX = coreX + coreWidth + quadrantGapX;
@@ -1745,45 +1918,28 @@ function layoutNodes(
       height: spec.height,
       accent: spec.config.accent,
       isPlaceholder: spec.isPlaceholder,
+      icon: spec.config.icon,
+      examples: spec.config.examples,
     });
   };
 
-  const placeInQuadrant = (
-    key: EcosystemGroupKey,
-    x: number,
-    y: number,
-    width: number,
-  ) => {
-    const spec = zoneSpecs.get(key);
-    if (!spec) return;
-    placeZone(key, x + (width - spec.width) / 2, y);
-  };
+  placeZone("workspace", leftX, coreY - zoneHeight("workspace") - quadrantGapY);
+  placeZone("learning", rightX, coreY - zoneHeight("learning") - quadrantGapY);
 
-  placeInQuadrant(
-    "workspace",
-    leftX,
-    coreY - zoneHeight("workspace") - quadrantGapY,
-    leftWidth,
-  );
-  placeInQuadrant(
-    "learning",
-    rightX,
-    coreY - zoneHeight("learning") - quadrantGapY,
-    rightWidth,
-  );
-
-  const placeStack = (
-    keys: EcosystemGroupKey[],
-    x: number,
-    y: number,
-    width: number,
-  ) => {
-    let cursorY = y;
+  const placeRow = (keys: EcosystemGroupKey[], centerX: number, y: number) => {
+    const specs = keys
+      .map((key) => zoneSpecs.get(key))
+      .filter((spec): spec is NonNullable<typeof spec> => Boolean(spec));
+    if (!specs.length) return;
+    const totalWidth =
+      specs.reduce((sum, spec) => sum + spec.width, 0) +
+      quadrantGapX * (specs.length - 1);
+    let cursorX = centerX - totalWidth / 2;
     keys.forEach((key) => {
       const spec = zoneSpecs.get(key);
       if (!spec) return;
-      placeZone(key, x + (width - spec.width) / 2, cursorY);
-      cursorY += spec.height + stackGap;
+      placeZone(key, cursorX, y);
+      cursorX += spec.width + quadrantGapX;
     });
   };
 
@@ -1812,9 +1968,13 @@ function layoutNodes(
     width: coreWidth,
     height: centralHeight,
     accent: "#a78bfa",
+    icon: Share2,
   });
-  placeStack(["platform", "pilot"], leftX, bottomRowY, leftWidth);
-  placeStack(["automation", "legacy"], rightX, bottomRowY, rightWidth);
+  placeRow(
+    ["platform", "pilot", "automation", "legacy"],
+    coreX + coreWidth / 2,
+    bottomRowY,
+  );
 
   return {
     positions,
@@ -3730,6 +3890,7 @@ function ArchitectureContent() {
   );
   const [showHelp, setShowHelp] = useState(false);
   const [showQuickRead, setShowQuickRead] = useState(false);
+  const [showMiniMap, setShowMiniMap] = useState(true);
   // Imperative handle to the canvas instead of useReactFlow(), because the
   // toolbar/panels that need to trigger a fit live outside <ReactFlow>'s own
   // subtree (useReactFlow() only works inside it without a separate
@@ -3905,6 +4066,8 @@ function ArchitectureContent() {
             isCore: zone.id === "zone-core",
             isPlaceholder: Boolean(zone.isPlaceholder),
             isMiniZone: isOverviewCompressed,
+            icon: zone.icon,
+            examples: zone.examples,
           },
           draggable: false,
           selectable: false,
@@ -4723,31 +4886,40 @@ function ArchitectureContent() {
                     </Popover>
                   </div>
                   <div
-                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 p-3 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "max-h-[calc(100%-240px)] w-[270px] overflow-y-auto" : "w-[210px]"}`}
+                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "max-h-[calc(100%-240px)] w-[270px] overflow-y-auto p-3" : "p-2"}`}
                   >
                     <button
                       onClick={() => setShowQuickRead((v) => !v)}
-                      className="flex w-full items-center justify-between gap-2 cursor-pointer"
+                      className={`flex cursor-pointer items-center gap-2 ${showQuickRead ? "w-full justify-between" : "justify-center"}`}
                       title={showQuickRead ? "Thu gọn" : "Mở rộng"}
+                      aria-label={
+                        showQuickRead
+                          ? "Thu gọn đọc nhanh hệ sinh thái"
+                          : "Mở đọc nhanh hệ sinh thái"
+                      }
                     >
-                      <div className="text-left">
-                        <div className="text-xs font-semibold text-slate-100">
-                          {mapMode === "risk"
-                            ? "Đọc nhanh rủi ro"
-                            : "Đọc nhanh hệ sinh thái"}
-                        </div>
-                        {showQuickRead && (
+                      {showQuickRead ? (
+                        <div className="text-left">
+                          <div className="text-xs font-semibold text-slate-100">
+                            {mapMode === "risk"
+                              ? "Đọc nhanh rủi ro"
+                              : "Đọc nhanh hệ sinh thái"}
+                          </div>
                           <div className="text-[10px] text-slate-400">
                             {architectureSummary.emphasizedSystems}/
                             {systems.length} hệ thống nổi bật ·{" "}
                             {architectureSummary.zones} cụm vệ tinh
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <Info className="h-4 w-4 text-slate-300" />
+                      )}
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="rounded-full border border-indigo-400/40 bg-indigo-400/10 px-2 py-1 text-[10px] font-semibold text-indigo-200">
-                          {mapMode === "risk" ? "Risk lens" : "Ecosystem"}
-                        </span>
+                        {showQuickRead && (
+                          <span className="rounded-full border border-indigo-400/40 bg-indigo-400/10 px-2 py-1 text-[10px] font-semibold text-indigo-200">
+                            {mapMode === "risk" ? "Risk lens" : "Ecosystem"}
+                          </span>
+                        )}
                         {showQuickRead ? (
                           <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
                         ) : (
@@ -4970,6 +5142,34 @@ function ArchitectureContent() {
                       </>
                     )}
                   </div>
+                  <div className="absolute left-1/2 bottom-4 z-10 flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-xl border border-slate-700/80 bg-slate-950/85 px-4 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: HEALTH_META.healthy.color }}
+                      />
+                      <span className="font-semibold text-slate-100">
+                        Healthy
+                      </span>
+                      Hệ thống hoạt động tốt
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: HEALTH_META.unknown.color }}
+                      />
+                      <span className="font-semibold text-slate-100">
+                        Unknown
+                      </span>
+                      Chưa xác định trạng thái
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="rounded border border-slate-600 px-1 font-mono font-semibold text-slate-200">
+                        X/Y
+                      </span>
+                      Số kết nối vào / ra
+                    </span>
+                  </div>
                   <Background color="#1e293b" gap={28} size={1} />
                   <Controls
                     style={{
@@ -4977,30 +5177,46 @@ function ArchitectureContent() {
                       border: "1px solid #1e293b",
                     }}
                   />
-                  <MiniMap
-                    nodeComponent={ArchitectureMiniMapNode}
-                    nodeColor={(node) => {
-                      const system = systems.find((s) => s._id === node.id);
-                      if (!system) return "#6366f1";
-                      // Match the lens: in Risk mode the map's primary
-                      // encoding is risk, not system type, so the MiniMap
-                      // should read the same way as the canvas
-                      // (.ai/architecture-overview-ux-review.md, "MiniMap
-                      // luôn theo system type").
-                      if (mapMode === "risk") {
-                        const worstHealth =
-                          integrationMetrics.get(system._id)?.worstHealth ??
-                          "unknown";
-                        return riskToneForSystem(system, worstHealth).color;
-                      }
-                      return TYPE_META[system.type]?.badge ?? "#6366f1";
-                    }}
-                    style={{
-                      background: "#0a1628",
-                      border: "1px solid #1e293b",
-                    }}
-                    maskColor="#06101e99"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowMiniMap((value) => !value)}
+                    className={`absolute right-4 z-20 inline-flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-950/85 px-2.5 py-2 text-[10px] font-semibold text-slate-300 shadow-lg backdrop-blur transition-colors hover:border-sky-400/60 hover:text-sky-200 ${
+                      showMiniMap ? "bottom-[178px]" : "bottom-4"
+                    }`}
+                    title={showMiniMap ? "Ẩn cửa sổ view" : "Hiện cửa sổ view"}
+                    aria-label={
+                      showMiniMap ? "Ẩn cửa sổ view" : "Hiện cửa sổ view"
+                    }
+                  >
+                    <Map className="h-3.5 w-3.5" />
+                    {showMiniMap ? "Ẩn view" : "Hiện view"}
+                  </button>
+                  {showMiniMap && (
+                    <MiniMap
+                      nodeComponent={ArchitectureMiniMapNode}
+                      nodeColor={(node) => {
+                        const system = systems.find((s) => s._id === node.id);
+                        if (!system) return "#6366f1";
+                        // Match the lens: in Risk mode the map's primary
+                        // encoding is risk, not system type, so the MiniMap
+                        // should read the same way as the canvas
+                        // (.ai/architecture-overview-ux-review.md, "MiniMap
+                        // luôn theo system type").
+                        if (mapMode === "risk") {
+                          const worstHealth =
+                            integrationMetrics.get(system._id)?.worstHealth ??
+                            "unknown";
+                          return riskToneForSystem(system, worstHealth).color;
+                        }
+                        return TYPE_META[system.type]?.badge ?? "#6366f1";
+                      }}
+                      style={{
+                        background: "#0a1628",
+                        border: "1px solid #1e293b",
+                      }}
+                      maskColor="#06101e99"
+                    />
+                  )}
                 </ReactFlow>
               )}
             </div>
