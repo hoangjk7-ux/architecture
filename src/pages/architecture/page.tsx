@@ -1757,10 +1757,9 @@ function layoutNodes(
   }
 
   const centralityScore = (system: System) => {
-    const m = metrics.get(system._id);
-    const connectionScore = (m?.inCount ?? 0) + (m?.outCount ?? 0);
+    const systemMetrics = metrics.get(system._id);
     return (
-      connectionScore * 4 +
+      ((systemMetrics?.inCount ?? 0) + (systemMetrics?.outCount ?? 0)) * 4 +
       (system.type === "core" ? 18 : 0) +
       (system.criticality === "high" ? 8 : 0) +
       (system.status === "active" ? 3 : 0) +
@@ -1770,293 +1769,60 @@ function layoutNodes(
 
   const sorted = [...systems].sort((a, b) => {
     const scoreDelta = centralityScore(b) - centralityScore(a);
-    if (scoreDelta !== 0) return scoreDelta;
-    return a.name.localeCompare(b.name);
+    return scoreDelta || a.name.localeCompare(b.name);
   });
-  const centralCount = Math.min(
-    systems.length > 14 ? 3 : systems.length > 7 ? 2 : 1,
-    systems.length,
-  );
+  const centralCount = Math.min(systems.length > 12 ? 2 : 1, systems.length);
   const centralIds = new Set(sorted.slice(0, centralCount).map((s) => s._id));
-
-  const central = sorted.filter((system) => centralIds.has(system._id));
-  const satellites = sorted.filter((system) => !centralIds.has(system._id));
-
-  const groups = new globalThis.Map<EcosystemGroupKey, System[]>();
-  (Object.keys(ECOSYSTEM_GROUPS) as EcosystemGroupKey[]).forEach((key) => {
-    groups.set(key, []);
-  });
-  satellites.forEach((system) => {
-    groups.get(classifyEcosystemGroup(system))!.push(system);
-  });
-
-  const zones: ArchitectureZone[] = [];
-  // Distance from each satellite zone (workspace/learning/platform+pilot/
-  // automation+legacy) to the central core — shared by all four so tightening
-  // it moves them in lockstep instead of only the one someone happens to be
-  // looking at (feedback: workspace's own card design is right, but its gap
-  // to the core read as too far, and the same gap drives the other three).
-  const quadrantGapX = isCompressed ? 20 : 22;
-  const quadrantGapY = isCompressed ? 10 : 14;
-  const canvasLeft = 0;
-  const coreWidth = isCompressed ? 230 : 252;
-  const coreY = isCompressed ? 214 : 292;
-  const centralGap = isCompressed ? 58 : 92;
-  const centralHeight = isCompressed
-    ? Math.max(220, 74 + central.length * centralGap)
-    : Math.max(264, 82 + central.length * centralGap);
-  const zoneSpecs = new globalThis.Map<
-    EcosystemGroupKey,
-    {
-      items: System[];
-      config: EcosystemGroupConfig;
-      columns: number;
-      width: number;
-      height: number;
-      headerOffset: number;
-      subtitle: string;
-      isPlaceholder: boolean;
-    }
-  >();
-
-  groups.forEach((items, key) => {
-    const config = ECOSYSTEM_GROUPS[key];
-    const isPlaceholder = items.length === 0;
-    if (isCompressed && isPlaceholder) return;
-    if (isPlaceholder) {
-      zoneSpecs.set(key, {
-        items,
-        config,
-        columns: 1,
-        // Matches the real (non-empty) 1-column zone width so an empty
-        // zone doesn't look out of place sitting next to one with systems
-        // in the same bottom row. Height budgets for icon+title, subtitle,
-        // the divider bar and up to 4 example bullets (see
-        // ECOSYSTEM_GROUPS[key].examples, rendered in the isPlaceholder
-        // branch of ZoneNode).
-        width: isCompressed ? 240 : 300,
-        height: isCompressed ? 150 : 178,
-        headerOffset: 0,
-        subtitle: "Chưa có hệ thống",
-        isPlaceholder: true,
-      });
-      return;
-    }
-    const size = zoneSizeFor(items.length, isCompressed);
-    const issueCount = items.filter((system) =>
-      ["degraded", "down"].includes(
-        metrics.get(system._id)?.worstHealth ?? "unknown",
-      ),
-    ).length;
-    const highDebtCount = items.filter(
-      (system) => system.technicalDebtScore >= 70,
-    ).length;
-    const statusNotes = [
-      `${items.length} hệ thống`,
-      issueCount ? `${issueCount} cần chú ý` : null,
-      highDebtCount ? `${highDebtCount} nợ kỹ thuật cao` : null,
-    ].filter(Boolean);
-    const subtitle = `${statusNotes.join(" · ")} · ${config.subtitle}`;
-    // Subtitle's real length decides the header block's height (see
-    // zoneHeaderHeight) — content width is the zone's inner width minus
-    // its left+right padding (18px each side, 14px in compact mode).
-    const contentWidth = size.width - (isCompressed ? 28 : 36);
-    const headerOffset = zoneHeaderHeight(subtitle, contentWidth, isCompressed);
-    zoneSpecs.set(key, {
-      items,
-      config,
-      columns: size.columns,
-      width: size.width,
-      height: headerOffset + size.gridHeight,
-      headerOffset,
-      subtitle,
-      isPlaceholder: false,
-    });
-  });
-
-  const zoneHeight = (key: EcosystemGroupKey) =>
-    zoneSpecs.get(key)?.height ?? 0;
-  const zoneWidth = (key: EcosystemGroupKey) => zoneSpecs.get(key)?.width ?? 0;
-  const maxZoneWidth = (keys: EcosystemGroupKey[]) =>
-    Math.max(...keys.map((key) => zoneWidth(key)), isCompressed ? 148 : 168);
-  // Reference layout (see .ai/ screenshot feedback): workspace top-left,
-  // learning top-right, core centered between/below them, and the
-  // remaining four groups (platform/pilot/automation/legacy) in a single
-  // horizontal row under the core — not stacked in two side columns like
-  // before. The row is centered on the core's own horizontal center so it
-  // reads as "everything else feeds the hub", and is free to span wider
-  // than the core since it usually holds more zones than either top slot.
-  const leftWidth = maxZoneWidth(["workspace"]);
-  const rightWidth = maxZoneWidth(["learning"]);
-  const leftX = canvasLeft;
-  const coreX = leftX + leftWidth + quadrantGapX;
-  const rightX = coreX + coreWidth + quadrantGapX;
-  const bottomRowY = coreY + centralHeight + quadrantGapY;
-
-  const placeZone = (key: EcosystemGroupKey, x: number, y: number) => {
-    const spec = zoneSpecs.get(key);
-    if (!spec) return;
-    if (!spec.isPlaceholder) {
-      placeGrid(
-        spec.items,
-        x,
-        y,
-        spec.columns,
-        positions,
-        isCompressed,
-        spec.headerOffset,
+  const satellites = sorted
+    .filter((system) => !centralIds.has(system._id))
+    .sort((a, b) => {
+      const groupOrder = Object.keys(ECOSYSTEM_GROUPS) as EcosystemGroupKey[];
+      return (
+        groupOrder.indexOf(classifyEcosystemGroup(a)) -
+          groupOrder.indexOf(classifyEcosystemGroup(b)) ||
+        a.name.localeCompare(b.name)
       );
-    }
-    zones.push({
-      id: `zone-${key}`,
-      title: spec.config.title,
-      subtitle: spec.isPlaceholder
-        ? `${spec.subtitle} · ${spec.config.subtitle}`
-        : spec.subtitle,
-      x,
-      y,
-      width: spec.width,
-      height: spec.height,
-      accent: spec.config.accent,
-      isPlaceholder: spec.isPlaceholder,
-      icon: spec.config.icon,
-      examples: spec.config.examples,
     });
-  };
 
-  const placeRow = (keys: EcosystemGroupKey[], centerX: number, y: number) => {
-    const specs = keys
-      .map((key) => zoneSpecs.get(key))
-      .filter((spec): spec is NonNullable<typeof spec> => Boolean(spec));
-    if (!specs.length) return;
-    const totalWidth =
-      specs.reduce((sum, spec) => sum + spec.width, 0) +
-      quadrantGapX * (specs.length - 1);
-    let cursorX = centerX - totalWidth / 2;
-    keys.forEach((key) => {
-      const spec = zoneSpecs.get(key);
-      if (!spec) return;
-      placeZone(key, cursorX, y);
-      cursorX += spec.width + quadrantGapX;
+  // Keep the canvas exclusively about software systems. Systems with the
+  // greatest architectural centrality form the hub; every other system sits
+  // on one or more clean elliptical orbits. Category cards and empty
+  // placeholders are intentionally omitted because they compete with the
+  // actual systems for attention.
+  const centerX = isCompressed ? 470 : 650;
+  const centerY = isCompressed ? 360 : 500;
+  const nodeWidth = isCompressed ? 132 : 172;
+  const nodeHeight = isCompressed ? 50 : 86;
+  const hubGap = isCompressed ? 62 : 98;
+
+  sorted
+    .filter((system) => centralIds.has(system._id))
+    .forEach((system, index) => {
+      positions[system._id] = {
+        x: centerX - nodeWidth / 2,
+        y: centerY - ((centralCount - 1) * hubGap) / 2 + index * hubGap,
+      };
     });
-  };
 
-  const coreCenterX = coreX + coreWidth / 2;
-
-  if (isCompressed) {
-    const orbitSlots: Record<
-      EcosystemGroupKey,
-      { x: number; y: number; align: "left" | "right" | "center" }
-    > = {
-      workspace: {
-        x: coreX - quadrantGapX - zoneWidth("workspace"),
-        y: coreY + 16,
-        align: "left",
-      },
-      learning: {
-        x: coreX + coreWidth + quadrantGapX,
-        y: coreY + 16,
-        align: "right",
-      },
-      platform: {
-        x: coreX - quadrantGapX - zoneWidth("platform"),
-        y: coreY + centralHeight - zoneHeight("platform") - 8,
-        align: "left",
-      },
-      pilot: {
-        x: coreCenterX - zoneWidth("pilot") - 18,
-        y: coreY + centralHeight + quadrantGapY,
-        align: "center",
-      },
-      automation: {
-        x: coreCenterX + 18,
-        y: coreY + centralHeight + quadrantGapY,
-        align: "center",
-      },
-      legacy: {
-        x: coreX + coreWidth + quadrantGapX,
-        y: coreY + centralHeight - zoneHeight("legacy") - 8,
-        align: "right",
-      },
-    };
-
-    (
-      [
-        "workspace",
-        "learning",
-        "platform",
-        "legacy",
-        "pilot",
-        "automation",
-      ] as EcosystemGroupKey[]
-    ).forEach((key) => {
-      if (!zoneSpecs.has(key)) return;
-      const slot = orbitSlots[key];
-      const fallbackX =
-        slot.align === "left"
-          ? coreX - quadrantGapX - zoneWidth(key)
-          : slot.align === "right"
-            ? coreX + coreWidth + quadrantGapX
-            : coreCenterX - zoneWidth(key) / 2;
-      placeZone(key, Number.isFinite(slot.x) ? slot.x : fallbackX, slot.y);
-    });
-  } else {
-    placeZone(
-      "workspace",
-      leftX,
-      coreY - zoneHeight("workspace") - quadrantGapY,
-    );
-    placeZone(
-      "learning",
-      rightX,
-      coreY - zoneHeight("learning") - quadrantGapY,
-    );
-  }
-
-  const centralBlockHeight =
-    (isCompressed ? 50 : 86) + (central.length - 1) * centralGap;
-  const centralStartY =
-    coreY +
-    (isCompressed
-      ? Math.max(56, (centralHeight - centralBlockHeight) / 2 + 14)
-      : Math.max(66, (centralHeight - centralBlockHeight) / 2 + 18));
-  central.forEach((system, index) => {
+  const perRing = isCompressed ? 10 : 12;
+  satellites.forEach((system, index) => {
+    const ring = Math.floor(index / perRing);
+    const ringItems = satellites.slice(ring * perRing, (ring + 1) * perRing);
+    const itemIndex = index % perRing;
+    const angle = -Math.PI / 2 + (itemIndex / ringItems.length) * Math.PI * 2;
+    const radiusX =
+      (isCompressed ? 285 : 455) + ring * (isCompressed ? 145 : 205);
+    const radiusY =
+      (isCompressed ? 210 : 330) + ring * (isCompressed ? 105 : 150);
     positions[system._id] = {
-      x: coreX + (coreWidth - (isCompressed ? 132 : 172)) / 2,
-      y: centralStartY + index * centralGap,
+      x: centerX + Math.cos(angle) * radiusX - nodeWidth / 2,
+      y: centerY + Math.sin(angle) * radiusY - nodeHeight / 2,
     };
   });
-  zones.push({
-    id: "zone-core",
-    title: "Lõi dữ liệu & điều phối hệ thống",
-    subtitle:
-      central.length === 1
-        ? "Trung tâm dữ liệu, kết nối và điều phối các vệ tinh vận hành"
-        : `${central.length} hub trung tâm điều phối dữ liệu, kết nối và luồng vận hành`,
-    x: coreX,
-    y: coreY,
-    width: coreWidth,
-    height: centralHeight,
-    accent: "#a78bfa",
-    icon: Share2,
-  });
-  if (!isCompressed) {
-    placeRow(
-      ["platform", "pilot", "automation", "legacy"],
-      coreX + coreWidth / 2,
-      bottomRowY,
-    );
-  }
 
-  return {
-    positions,
-    centralIds,
-    metrics,
-    zones,
-  };
+  return { positions, centralIds, zones: [], metrics };
 }
 
-// ─── Module Form ─────────────────────────────────────────────────────────────
 type ModuleFormData = {
   name: string;
   lifecycle: SystemModule["lifecycle"];
@@ -2067,6 +1833,7 @@ type ModuleFormData = {
   plannedDate: string;
   usedBy: string;
 };
+
 const defaultModuleForm: ModuleFormData = {
   name: "",
   lifecycle: "in_use",
