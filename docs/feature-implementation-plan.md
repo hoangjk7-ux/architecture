@@ -31,19 +31,42 @@ SRS vào hệ thống TechGov hiện tại.
 
 ### 2.2. Khoảng trống so với SRS
 
-| Nhóm nghiệp vụ | Hiện trạng |
-| --- | --- |
-| Demand Management | Chưa có |
-| Demand assessment và approval workflow | Chưa có |
-| Project lifecycle | Roadmap mới đáp ứng một phần |
-| Resource và skill matrix | Có allocation cơ bản, chưa có employee/capacity/skill |
-| Timesheet | Chưa có |
-| Budget Management | Chưa có |
-| Portfolio và Department dashboard | Chưa đủ dữ liệu nghiệp vụ |
-| Notification | Chưa có nền tảng tổng quát |
-| Audit Log | Cần tổng quát hóa cho mọi entity |
-| RBAC | Hiện có 4 role, SRS yêu cầu 11 role |
-| External integration | Mới quản lý metadata, chưa đồng bộ dữ liệu |
+| Nhóm nghiệp vụ                         | Hiện trạng                                            |
+| -------------------------------------- | ----------------------------------------------------- |
+| Demand Management                      | Chưa có                                               |
+| Demand assessment và approval workflow | Chưa có                                               |
+| Project lifecycle                      | Roadmap mới đáp ứng một phần                          |
+| Resource và skill matrix               | Có allocation cơ bản, chưa có employee/capacity/skill |
+| Timesheet                              | Chưa có                                               |
+| Budget Management                      | Chưa có                                               |
+| Portfolio và Department dashboard      | Chưa đủ dữ liệu nghiệp vụ                             |
+| Notification                           | Chưa có nền tảng tổng quát                            |
+| Audit Log                              | Cần tổng quát hóa cho mọi entity                      |
+| RBAC                                   | Hiện có 4 role, SRS yêu cầu 11 role                   |
+| External integration                   | Mới quản lý metadata, chưa đồng bộ dữ liệu            |
+
+### 2.3. Trạng thái thiết kế lại Architecture Map
+
+Thiết kế orbit đã được triển khai trên trang Architecture Map:
+
+- `CoreOrbit` hiển thị 1–3 hub theo centrality score.
+- Hệ thống được phân vào vòng `operational` hoặc `outer` theo loại, trạng thái,
+  nhóm nghiệp vụ và technical debt; dataset dày tự tách thêm sub-ring lệch pha.
+- Sáu zone nghiệp vụ được trình bày dưới dạng callout ngoài quỹ đạo, có connector
+  không tương tác và không dùng làm background lớn.
+- Focus, Hide, camera fit và semantic zoom dùng chung kết quả phân loại của
+  thuật toán layout; Hide loại node và edge khỏi canvas thực sự.
+- Thuật toán phân loại/layout nằm tại
+  `src/pages/architecture/architecture-layout.ts` và có unit test riêng.
+
+Tiêu chí regression cho Architecture Map:
+
+- Tên nhóm tiếng Việt có dấu phải được phân loại nhất quán.
+- Mọi hệ thống phải có đúng một ring và tọa độ hữu hạn, không trùng tọa độ trong
+  cùng lần layout.
+- Thay đổi kích thước canvas ở trạng thái overview phải tự fit lại toàn cảnh.
+- Zone rỗng không được kích hoạt focus làm mờ toàn bộ sơ đồ.
+- Node, zone, connector và edge của zone bị ẩn không tham gia canvas tương tác.
 
 ## 3. Phạm vi ưu tiên
 
@@ -389,16 +412,16 @@ Các entity chính:
 
 ## 9. Rủi ro và biện pháp kiểm soát
 
-| Rủi ro | Biện pháp |
-| --- | --- |
-| Phạm vi quá lớn | Phát hành theo vertical slice và khóa scope từng release |
-| Workflow bị hard-code | Dùng transition policy chung và version hóa cấu hình |
-| Sai quyền truy cập | Authorization tại backend và test theo từng role |
-| Số liệu tài chính thay đổi hồi tố | Effective-dated rate và snapshot actual |
-| Allocation sai do khoảng ngày giao nhau | Kiểm tra overlap trong cùng transaction |
-| Dashboard không khớp dữ liệu nguồn | Định nghĩa metric và hỗ trợ drill-down |
-| Đồng bộ ngoài tạo dữ liệu trùng | External mapping và idempotency key |
-| Tăng nợ kỹ thuật | CI gate, diff coverage và giới hạn kích thước module |
+| Rủi ro                                  | Biện pháp                                                |
+| --------------------------------------- | -------------------------------------------------------- |
+| Phạm vi quá lớn                         | Phát hành theo vertical slice và khóa scope từng release |
+| Workflow bị hard-code                   | Dùng transition policy chung và version hóa cấu hình     |
+| Sai quyền truy cập                      | Authorization tại backend và test theo từng role         |
+| Số liệu tài chính thay đổi hồi tố       | Effective-dated rate và snapshot actual                  |
+| Allocation sai do khoảng ngày giao nhau | Kiểm tra overlap trong cùng transaction                  |
+| Dashboard không khớp dữ liệu nguồn      | Định nghĩa metric và hỗ trợ drill-down                   |
+| Đồng bộ ngoài tạo dữ liệu trùng         | External mapping và idempotency key                      |
+| Tăng nợ kỹ thuật                        | CI gate, diff coverage và giới hạn kích thước module     |
 
 ## 10. Các quyết định nghiệp vụ cần chốt
 
