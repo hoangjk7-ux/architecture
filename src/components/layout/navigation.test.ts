@@ -17,6 +17,7 @@ describe("layout navigation", () => {
     expect([...primaryItems, ...overflowItems]).toEqual(visible);
     expect(primaryItems).toHaveLength(4);
     expect(overflowItems.map((item) => item.to)).toEqual([
+      "/demands",
       "/integrations",
       "/roadmap",
       "/users",
@@ -33,9 +34,13 @@ describe("layout navigation", () => {
       "/systems",
       "/vendors",
       "/architecture",
+      "/demands",
       "/roadmap",
     ]);
-    expect(overflowItems.map((item) => item.to)).toEqual(["/roadmap"]);
+    expect(overflowItems.map((item) => item.to)).toEqual([
+      "/demands",
+      "/roadmap",
+    ]);
   });
 
   it("does not mutate the authorized navigation list", () => {

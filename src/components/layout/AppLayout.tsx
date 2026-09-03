@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Bell,
 } from "lucide-react";
 import { LanguageToggle } from "@/components/ui/language-toggle.tsx";
 import {
@@ -24,6 +25,68 @@ import { MobileNavigation } from "./MobileNavigation.tsx";
 import { visibleNavigationForRole } from "./navigation.ts";
 import { preloadNavigationItem } from "./navigation.ts";
 import { RouteBoundary } from "@/shared/routing/RouteBoundary.tsx";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover.tsx";
+
+function NotificationCenter() {
+  const notifications = useQuery(api.notifications.listMine);
+  const markRead = useMutation(api.notifications.markRead);
+  const unread = notifications?.filter((item) => !item.readAt).length ?? 0;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={`Thông báo${unread ? ` (${unread} chưa đọc)` : ""}`}
+        >
+          <Bell className="h-4 w-4" />
+          {unread > 0 && (
+            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="border-b px-4 py-3 text-sm font-semibold">
+          Thông báo
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {notifications === undefined ? (
+            <div className="p-4 text-sm text-muted-foreground">Đang tải…</div>
+          ) : notifications.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              Chưa có thông báo
+            </div>
+          ) : (
+            notifications.map((item) => (
+              <button
+                key={item._id}
+                type="button"
+                className={cn(
+                  "w-full border-b px-4 py-3 text-left hover:bg-muted/50",
+                  !item.readAt && "bg-primary/5",
+                )}
+                onClick={() => void markRead({ notificationId: item._id })}
+              >
+                <div className="text-sm font-medium">{item.title}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {item.message}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function AppLayoutInner() {
   const { user } = useCurrentUser();
@@ -110,6 +173,7 @@ function AppLayoutInner() {
               collapsed ? "justify-center" : "justify-start px-1",
             )}
           >
+            <NotificationCenter />
             {collapsed ? <LanguageToggle iconOnly /> : <LanguageToggle />}
           </div>
           {user && (
@@ -165,6 +229,7 @@ function AppLayoutInner() {
         <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-sidebar">
           <span className="font-bold text-sm">TechGov</span>
           <div className="flex items-center gap-2">
+            <NotificationCenter />
             <LanguageToggle />
           </div>
         </div>

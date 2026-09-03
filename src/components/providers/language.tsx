@@ -20,6 +20,7 @@ const translations: TranslationMap = {
   "auth.google": { vi: "Đăng nhập bằng Google", en: "Sign in with Google" },
   "auth.or": { vi: "hoặc", en: "or" },
   "nav.dashboard": { vi: "Bảng điều khiển", en: "Dashboard" },
+  "nav.demands": { vi: "Yêu cầu nghiệp vụ", en: "Demands" },
   "nav.systems": { vi: "Kho hệ thống", en: "System inventory" },
   "nav.vendors": { vi: "Nhà cung cấp", en: "Vendors" },
   "nav.architecture": { vi: "Bản đồ kiến trúc", en: "Architecture map" },

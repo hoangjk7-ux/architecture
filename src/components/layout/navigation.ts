@@ -7,6 +7,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import { routeRoles, type UserRole } from "@/lib/permissions.ts";
@@ -43,6 +44,12 @@ export const navigationItems: NavigationItem[] = [
     icon: Map,
     labelKey: "nav.architecture",
     roles: routeRoles.architecture,
+  },
+  {
+    to: "/demands",
+    icon: ClipboardList,
+    labelKey: "nav.demands",
+    roles: routeRoles.demands,
   },
   {
     to: "/integrations",

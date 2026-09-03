@@ -3,7 +3,18 @@ import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-export type UserRole = "cto" | "it_manager" | "business_owner" | "viewer";
+export type UserRole =
+  | "cto"
+  | "it_manager"
+  | "business_owner"
+  | "viewer"
+  | "requester"
+  | "business_analyst"
+  | "technical_assessor"
+  | "approver"
+  | "project_manager"
+  | "resource_manager"
+  | "finance_manager";
 
 type CurrentUser = {
   _id: Id<"users">;
@@ -57,7 +68,19 @@ export async function requireWriteAccess(ctx: QueryCtx | MutationCtx) {
 }
 
 export async function requireReadAccess(ctx: QueryCtx | MutationCtx) {
-  return requireRole(ctx, ["cto", "it_manager", "business_owner", "viewer"]);
+  return requireRole(ctx, [
+    "cto",
+    "it_manager",
+    "business_owner",
+    "viewer",
+    "requester",
+    "business_analyst",
+    "technical_assessor",
+    "approver",
+    "project_manager",
+    "resource_manager",
+    "finance_manager",
+  ]);
 }
 
 export async function requireCTO(ctx: QueryCtx | MutationCtx) {

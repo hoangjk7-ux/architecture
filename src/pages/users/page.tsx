@@ -49,6 +49,34 @@ const roleConfig = {
     label: "VIEWER",
     color: "bg-gray-500/20 text-gray-400 border-gray-500/30",
   },
+  requester: {
+    label: "REQUESTER",
+    color: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  },
+  business_analyst: {
+    label: "BUSINESS ANALYST",
+    color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
+  },
+  technical_assessor: {
+    label: "TECHNICAL ASSESSOR",
+    color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+  },
+  approver: {
+    label: "APPROVER",
+    color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  },
+  project_manager: {
+    label: "PROJECT MANAGER",
+    color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  },
+  resource_manager: {
+    label: "RESOURCE MANAGER",
+    color: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  },
+  finance_manager: {
+    label: "FINANCE MANAGER",
+    color: "bg-rose-500/20 text-rose-400 border-rose-500/30",
+  },
 } as const;
 
 const roleDesc: Record<keyof typeof roleConfig, string> = {
@@ -56,6 +84,13 @@ const roleDesc: Record<keyof typeof roleConfig, string> = {
   it_manager: "Đọc/ghi tất cả, ngoại trừ Users",
   business_owner: "Xem systems, vendors, roadmap",
   viewer: "Chỉ đọc",
+  requester: "Tạo và theo dõi demand",
+  business_analyst: "Đánh giá nghiệp vụ",
+  technical_assessor: "Đánh giá kỹ thuật",
+  approver: "Phê duyệt demand",
+  project_manager: "Quản lý dự án",
+  resource_manager: "Quản lý nguồn lực",
+  finance_manager: "Quản lý ngân sách",
 };
 
 type Role = keyof typeof roleConfig;

@@ -9,6 +9,7 @@ const routeLoaders = {
   "/roadmap": () => import("@/pages/roadmap/page.tsx"),
   "/users": () => import("@/pages/users/page.tsx"),
   "/settings": () => import("@/pages/settings/page.tsx"),
+  "/demands": () => import("@/pages/demands/page.tsx"),
 } as const;
 
 export type PreloadableRoute = keyof typeof routeLoaders;
@@ -22,6 +23,7 @@ export const routeComponents = {
   roadmap: lazy(routeLoaders["/roadmap"]),
   users: lazy(routeLoaders["/users"]),
   settings: lazy(routeLoaders["/settings"]),
+  demands: lazy(routeLoaders["/demands"]),
 };
 
 export function preloadRoute(path: string) {

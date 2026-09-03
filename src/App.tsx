@@ -18,6 +18,7 @@ const {
   roadmap: RoadmapPage,
   users: UsersPage,
   settings: SettingsPage,
+  demands: DemandsPage,
 } = routeComponents;
 
 export default function App() {
@@ -33,6 +34,14 @@ export default function App() {
                 element={
                   <RequireRole roles={routeRoles.dashboard}>
                     <Index />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/demands"
+                element={
+                  <RequireRole roles={routeRoles.demands}>
+                    <DemandsPage />
                   </RequireRole>
                 }
               />

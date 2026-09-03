@@ -4,6 +4,7 @@ import { requireAuthenticated, requireCTO } from "./helpers";
 import { domainError, normalizeEmail, optionalText } from "./domain/common";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { writeAudit } from "./domain/governance";
 
 type UserRole = NonNullable<Doc<"users">["role"]>;
 
@@ -103,6 +104,13 @@ export const inviteUser = mutation({
       v.literal("it_manager"),
       v.literal("business_owner"),
       v.literal("viewer"),
+      v.literal("requester"),
+      v.literal("business_analyst"),
+      v.literal("technical_assessor"),
+      v.literal("approver"),
+      v.literal("project_manager"),
+      v.literal("resource_manager"),
+      v.literal("finance_manager"),
     ),
   },
   handler: async (ctx, args) => {
@@ -118,15 +126,32 @@ export const inviteUser = mutation({
     const existing = sameEmail[0];
     if (existing) {
       await assertCtoCanBeRemovedOrDemoted(ctx, existing, args.role);
+      const beforeRole = existing.role;
       await ctx.db.patch(existing._id, { role: args.role });
+      const actor = await requireCTO(ctx);
+      await writeAudit(
+        ctx,
+        actor._id,
+        "user",
+        existing._id,
+        "role_changed",
+        { role: beforeRole },
+        { role: args.role },
+      );
       return existing._id;
     }
-    return await ctx.db.insert("users", {
+    const id = await ctx.db.insert("users", {
       name: optionalText(args.name),
       email,
       role: args.role,
       isManuallyAdded: true,
     });
+    const actor = await requireCTO(ctx);
+    await writeAudit(ctx, actor._id, "user", id, "invited", undefined, {
+      email,
+      role: args.role,
+    });
+    return id;
   },
 });
 
@@ -142,6 +167,10 @@ export const removeUser = mutation({
     }
     const target = await getTargetUser(ctx, args.userId);
     await assertCtoCanBeRemovedOrDemoted(ctx, target);
+    await writeAudit(ctx, me._id, "user", target._id, "removed", {
+      email: target.email,
+      role: target.role,
+    });
     await ctx.db.delete(args.userId);
   },
 });
@@ -154,12 +183,28 @@ export const updateUserRole = mutation({
       v.literal("it_manager"),
       v.literal("business_owner"),
       v.literal("viewer"),
+      v.literal("requester"),
+      v.literal("business_analyst"),
+      v.literal("technical_assessor"),
+      v.literal("approver"),
+      v.literal("project_manager"),
+      v.literal("resource_manager"),
+      v.literal("finance_manager"),
     ),
   },
   handler: async (ctx, args) => {
-    await requireCTO(ctx);
+    const actor = await requireCTO(ctx);
     const target = await getTargetUser(ctx, args.userId);
     await assertCtoCanBeRemovedOrDemoted(ctx, target, args.role);
     await ctx.db.patch(args.userId, { role: args.role });
+    await writeAudit(
+      ctx,
+      actor._id,
+      "user",
+      target._id,
+      "role_changed",
+      { role: target.role },
+      { role: args.role },
+    );
   },
 });

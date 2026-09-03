@@ -20,6 +20,13 @@ export default defineSchema({
         v.literal("it_manager"),
         v.literal("business_owner"),
         v.literal("viewer"),
+        v.literal("requester"),
+        v.literal("business_analyst"),
+        v.literal("technical_assessor"),
+        v.literal("approver"),
+        v.literal("project_manager"),
+        v.literal("resource_manager"),
+        v.literal("finance_manager"),
       ),
     ),
     isManuallyAdded: v.optional(v.boolean()),
@@ -241,4 +248,91 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_level", ["level"])
     .index("by_parent", ["parentId"]),
+
+  departments: defineTable({
+    name: v.string(),
+    code: v.string(),
+    parentId: v.optional(v.id("departments")),
+    active: v.boolean(),
+  }).index("by_code", ["code"]),
+
+  demands: defineTable({
+    code: v.string(),
+    title: v.string(),
+    description: v.string(),
+    category: v.string(),
+    departmentId: v.optional(v.id("departments")),
+    requesterId: v.id("users"),
+    ownerId: v.optional(v.id("users")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("submitted"),
+      v.literal("ba_review"),
+      v.literal("changes_requested"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+    businessValue: v.number(),
+    strategicAlignment: v.number(),
+    urgency: v.number(),
+    complianceImpact: v.number(),
+    estimatedEffort: v.number(),
+    priorityScore: v.number(),
+    scoringModelVersion: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    submittedAt: v.optional(v.number()),
+  })
+    .index("by_requester", ["requesterId"])
+    .index("by_status", ["status"])
+    .index("by_code", ["code"]),
+
+  approvals: defineTable({
+    entityType: v.string(),
+    entityId: v.string(),
+    requestedBy: v.id("users"),
+    decidedBy: v.optional(v.id("users")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("changes_requested"),
+    ),
+    comment: v.optional(v.string()),
+    createdAt: v.number(),
+    decidedAt: v.optional(v.number()),
+  }).index("by_entity", ["entityType", "entityId"]),
+
+  workflow_events: defineTable({
+    entityType: v.string(),
+    entityId: v.string(),
+    fromState: v.string(),
+    toState: v.string(),
+    actorId: v.id("users"),
+    comment: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_entity", ["entityType", "entityId"]),
+
+  notifications: defineTable({
+    recipientId: v.id("users"),
+    type: v.string(),
+    title: v.string(),
+    message: v.string(),
+    entityType: v.optional(v.string()),
+    entityId: v.optional(v.string()),
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_recipient", ["recipientId", "createdAt"]),
+
+  audit_events: defineTable({
+    entityType: v.string(),
+    entityId: v.string(),
+    actorId: v.id("users"),
+    action: v.string(),
+    before: v.optional(v.string()),
+    after: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_entity", ["entityType", "entityId"])
+    .index("by_actor", ["actorId", "createdAt"]),
 });
