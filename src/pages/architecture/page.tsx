@@ -607,7 +607,18 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         >
           {meta.label}
         </span>
-        <span style={{ color: "#fff", fontSize: 9, opacity: 0.9 }}>
+        <span
+          style={{
+            color: "#fff",
+            fontSize: 9,
+            opacity: 0.9,
+            minWidth: 0,
+            maxWidth: "72%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {isCentral ? (
             <span
               style={{
@@ -673,6 +684,10 @@ function SystemNode({ data }: NodeProps<NodeData>) {
                 fontSize: isCentral ? 11 : 10,
                 lineHeight: 1.25,
                 marginBottom: 1,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
               }}
             >
               {s.name}
@@ -1104,9 +1119,10 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
                 fontSize: 8,
                 fontWeight: 500,
                 lineHeight: 1.2,
-                // No clamp: zoneHeaderHeight sizes this zone's header from
-                // this exact subtitle text, so it already has room to wrap
-                // in full — see the default zone template above.
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
               }}
             >
               {data.subtitle}
@@ -1202,11 +1218,10 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
           color: "#94a3b8",
           fontSize: 10,
           lineHeight: 1.35,
-          // No clamp: the zone's header space is sized per-zone from this
-          // exact text by zoneHeaderHeight, so it wraps to however many
-          // lines it needs without overlapping the node grid below —
-          // truncating it here would just hide information that already
-          // has room to be shown in full.
+          display: "-webkit-box",
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
         }}
       >
         {data.subtitle}
@@ -3898,8 +3913,12 @@ function ArchitectureContent() {
     [allModules, selectedId],
   );
   const architectureLayout = useMemo(
-    () => layoutNodes(systems, integrations, isOverviewCompressed),
-    [systems, integrations, isOverviewCompressed],
+    // Keep one stable, full-size geometry at every zoom level. Semantic zoom
+    // changes card contents only; recalculating positions with compact node
+    // dimensions made React Flow re-measure cards at the 0.72 threshold and
+    // caused both text and neighboring cards to overlap.
+    () => layoutNodes(systems, integrations, false),
+    [systems, integrations],
   );
   // Reuse the metrics `layoutNodes` already computed for centralityScore
   // instead of running the same O(integrations) aggregation a second time.
@@ -4098,6 +4117,11 @@ function ArchitectureContent() {
           isMini: isOverviewCompressed,
         },
         style: {
+          // Reserve the detailed card's maximum footprint even while the mini
+          // visual is rendered. React Flow then keeps identical bounds and
+          // edge anchors when semantic zoom switches content density.
+          width: isCentral ? 172 : 146,
+          height: 150,
           opacity: selectedId
             ? connectedNodeIds!.has(s._id)
               ? 1

@@ -161,5 +161,16 @@ describe("architecture orbit layout", () => {
           Number.isFinite(position.x) && Number.isFinite(position.y),
       ),
     ).toBe(true);
+    const positions = Object.values(result.positions);
+    const minimumDistance = Math.min(
+      ...positions.flatMap((position, index) =>
+        positions
+          .slice(index + 1)
+          .map((other) =>
+            Math.hypot(position.x - other.x, position.y - other.y),
+          ),
+      ),
+    );
+    expect(minimumDistance).toBeGreaterThan(70);
   });
 });
