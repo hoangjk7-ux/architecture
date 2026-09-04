@@ -394,6 +394,7 @@ const COMPACT_ZOOM_THRESHOLD = 0.35;
 const SYSTEM_NODE_WIDTH = 170;
 const CORE_NODE_WIDTH = 260;
 const SYSTEM_NODE_HEIGHT = 84;
+const REFERENCE_CANVAS = { width: 1449, height: 1086 } as const;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
   const zoom = useStore(zoomSelector);
@@ -442,8 +443,10 @@ function SystemNode({ data }: NodeProps<NodeData>) {
       <div
         title={`${s.name} · ${s.category ?? ""}`}
         style={{
-          background: isRiskMode ? "#0f172acc" : "#0b1222dd",
-          borderRadius: 12,
+          background: isRiskMode
+            ? "linear-gradient(180deg, #1f1119f2, #07101ef7)"
+            : "linear-gradient(180deg, rgba(10,25,44,.95), rgba(6,16,30,.98))",
+          borderRadius: 20,
           width: nodeWidth,
           height: SYSTEM_NODE_HEIGHT,
           cursor: "pointer",
@@ -453,8 +456,8 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           boxShadow: isSelected
             ? `0 0 0 3px ${meta.border}55, 0 8px 24px #0008`
             : isCentral
-              ? `0 0 28px ${groupAccent}38, 0 4px 14px #0008`
-              : `0 0 18px ${groupAccent}20, 0 3px 12px #0008`,
+              ? `0 0 30px ${groupAccent}48, 0 10px 24px #0008`
+              : `0 0 20px ${groupAccent}22, 0 12px 24px #0007`,
           padding: isCentral ? "10px 12px" : "8px 10px",
           transition: "all 0.15s",
         }}
@@ -869,10 +872,10 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
       style={{
         width: "100%",
         height: "100%",
-        border: `2px solid ${data.accent}`,
+        border: `4px solid ${data.accent}`,
         borderRadius: "50%",
-        background: `radial-gradient(ellipse at center, ${data.accent}32 0%, ${data.accent}16 38%, #06101fe8 72%)`,
-        boxShadow: `0 0 0 6px ${data.accent}12, 0 0 42px ${data.accent}55, inset 0 0 38px ${data.accent}32`,
+        background: `radial-gradient(circle at 50% 38%, ${data.accent}42 0%, #071222f7 65%)`,
+        boxShadow: `0 0 0 8px ${data.accent}12, 0 0 38px ${data.accent}88, inset 0 0 42px ${data.accent}28`,
         pointerEvents: "none",
         position: "relative",
         overflow: "hidden",
@@ -900,9 +903,9 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
             color: "#f5f3ff",
             maxWidth: 230,
             margin: "0 auto",
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: 900,
-            lineHeight: 1.28,
+            lineHeight: 1.18,
             letterSpacing: 0.6,
             textTransform: "uppercase",
             textShadow: `0 0 18px ${data.accent}`,
@@ -913,9 +916,9 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
         <div
           style={{
             maxWidth: 270,
-            margin: "7px auto 0",
+            margin: "9px auto 0",
             color: "#c4b5fd",
-            fontSize: 9,
+            fontSize: 10,
             lineHeight: 1.35,
           }}
         >
@@ -1803,8 +1806,8 @@ function layoutNodes(
   // The systems form the operational orbit. Small callout zones around it
   // preserve the business grouping from the reference without turning the
   // canvas back into a collection of large background rectangles.
-  const centerX = isCompressed ? 470 : 650;
-  const centerY = isCompressed ? 360 : 430;
+  const centerX = isCompressed ? 470 : REFERENCE_CANVAS.width / 2;
+  const centerY = isCompressed ? 360 : 490;
   const coreNodeWidth = isCompressed ? 148 : CORE_NODE_WIDTH;
   const satelliteNodeWidth = isCompressed ? 128 : SYSTEM_NODE_WIDTH;
   const nodeHeight = isCompressed ? 64 : SYSTEM_NODE_HEIGHT;
@@ -1846,19 +1849,19 @@ function layoutNodes(
   };
   const operationalLayers = placeRing(
     ringSystems.operational,
-    isCompressed ? 285 : 370,
-    isCompressed ? 210 : 280,
+    isCompressed ? 285 : 350,
+    isCompressed ? 210 : 300,
     isCompressed ? 10 : 8,
   );
   const outerLayers = placeRing(
     ringSystems.outer,
-    isCompressed ? 400 : 520,
-    isCompressed ? 290 : 380,
+    isCompressed ? 400 : 430,
+    isCompressed ? 290 : 390,
     isCompressed ? 14 : 12,
   );
 
   const calloutWidth = isCompressed ? 240 : 260;
-  const calloutHeight = isCompressed ? 74 : 88;
+  const calloutHeight = isCompressed ? 74 : 102;
   const groupCounts = new globalThis.Map<EcosystemGroupKey, number>();
   satellites.forEach((system) => {
     const key = classifyEcosystemGroup(system);
@@ -1868,39 +1871,50 @@ function layoutNodes(
   const calloutPositions: Record<EcosystemGroupKey, { x: number; y: number }> =
     {
       workspace: {
-        x: 20 - denseOffset,
-        y: 20 - denseOffset / 2,
+        x: 48 - denseOffset,
+        y: 32 - denseOffset / 2,
       },
       learning: {
-        x: 1020 + denseOffset,
-        y: 20 - denseOffset / 2,
+        x: 1049 + denseOffset,
+        y: 32 - denseOffset / 2,
       },
       platform: {
-        x: 20 - denseOffset,
-        y: 650 + denseOffset / 2,
+        x: 48 - denseOffset,
+        y: 822 + denseOffset / 2,
       },
       pilot: {
-        x: centerX - calloutWidth / 2,
-        y: 760 + denseOffset,
+        x: centerX - (isCompressed ? calloutWidth : 338) / 2,
+        y: 935 + denseOffset,
       },
       automation: {
-        x: 780 + denseOffset,
-        y: 650 + denseOffset / 2,
+        x: 919 + denseOffset,
+        y: 822 + denseOffset / 2,
       },
       legacy: {
-        x: 1060 + denseOffset,
-        y: 650 + denseOffset / 2,
+        x: 1169 + denseOffset,
+        y: 822 + denseOffset / 2,
       },
     };
+  const calloutSizes: Record<
+    EcosystemGroupKey,
+    { width: number; height: number }
+  > = {
+    workspace: { width: 350, height: 102 },
+    learning: { width: 352, height: 102 },
+    platform: { width: 270, height: 112 },
+    pilot: { width: 338, height: 112 },
+    automation: { width: 232, height: 112 },
+    legacy: { width: 232, height: 112 },
+  };
   const zones: ArchitectureZone[] = [
     {
       id: "zone-core",
       title: "Lõi dữ liệu & điều phối hệ thống",
       subtitle: `${centralIds.size} hub trung tâm điều phối dữ liệu, kết nối và luồng vận hành`,
-      x: centerX - (centralCount > 1 ? 250 : 210),
-      y: centerY - (centralCount === 3 ? 220 : 190),
-      width: centralCount > 1 ? 500 : 420,
-      height: centralCount === 3 ? 440 : 380,
+      x: centerX - 220,
+      y: centerY - 220,
+      width: 440,
+      height: 440,
       accent: "#8b5cf6",
     },
     ...(
@@ -1914,8 +1928,8 @@ function layoutNodes(
       subtitle: `${groupCounts.get(key) ?? 0} hệ thống · ${config.subtitle}`,
       x: calloutPositions[key].x,
       y: calloutPositions[key].y,
-      width: calloutWidth,
-      height: calloutHeight,
+      width: isCompressed ? calloutWidth : calloutSizes[key].width,
+      height: isCompressed ? calloutHeight : calloutSizes[key].height,
       accent: config.accent,
       icon: config.icon,
     })),
@@ -1923,21 +1937,29 @@ function layoutNodes(
   const orbits = [
     {
       id: "orbit-inner",
-      x: centerX - 370,
-      y: centerY - 280,
-      width: 740,
-      height: 560,
-      accent: "#8b5cf699",
+      x: centerX - 285,
+      y: centerY - 285,
+      width: 570,
+      height: 570,
+      accent: "#8b5cf640",
+    },
+    {
+      id: "orbit-middle",
+      x: centerX - 350,
+      y: centerY - 350,
+      width: 700,
+      height: 700,
+      accent: "#8b5cf67a",
       dashed: true,
       glow: true,
     },
     {
       id: "orbit-outer",
-      x: centerX - 520,
-      y: centerY - 380,
-      width: 1040,
-      height: 760,
-      accent: "#0ea5e966",
+      x: centerX - 430,
+      y: centerY - 430,
+      width: 860,
+      height: 860,
+      accent: "#1997ff48",
     },
   ];
   const connectors = zones
@@ -1954,7 +1976,7 @@ function layoutNodes(
         y,
         length: Math.max(
           24,
-          Math.hypot(deltaX, deltaY) - (isCompressed ? 315 : 480),
+          Math.hypot(deltaX, deltaY) - (isCompressed ? 315 : 425),
         ),
         angle: Math.atan2(deltaY, deltaX),
         accent: zone.accent,
@@ -4827,8 +4849,12 @@ function ArchitectureContent() {
           <div className="flex flex-1 overflow-hidden">
             <div
               ref={canvasHostRef}
-              className="flex-1 overflow-hidden"
-              style={{ background: "#060d1f" }}
+              className="relative flex-1 overflow-hidden"
+              style={{
+                backgroundColor: "#050d19",
+                backgroundImage:
+                  "radial-gradient(circle at 50% 48%, rgba(63,36,120,.22), transparent 30%), radial-gradient(circle at 78% 18%, rgba(0,117,255,.10), transparent 22%), linear-gradient(180deg,#07111f 0%,#050d19 100%)",
+              }}
             >
               {systems.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-muted-foreground">
