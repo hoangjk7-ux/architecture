@@ -143,9 +143,14 @@ export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
     capacity: number;
     layerGapX: number;
     layerGapY: number;
+    horizontalStagger?: number;
+    collisionGap?: number;
   },
 ) {
   const positions: Record<string, { x: number; y: number }> = {};
+  const horizontalStagger = options.horizontalStagger ?? 0;
+  const collisionGap = options.collisionGap ?? 0;
+  const placed: Array<{ x: number; y: number }> = [];
   const layers = Math.max(1, Math.ceil(systems.length / options.capacity));
   for (let layer = 0; layer < layers; layer += 1) {
     const layerSystems = systems.slice(
@@ -157,16 +162,38 @@ export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
         -Math.PI / 2 +
         (index / Math.max(layerSystems.length, 1)) * Math.PI * 2 +
         (layer % 2 ? Math.PI / Math.max(layerSystems.length, 2) : 0);
-      positions[system._id] = {
+      const base = {
         x:
           options.centerX +
           Math.cos(angle) * (options.radiusX + layer * options.layerGapX) -
-          options.nodeWidth / 2,
+          options.nodeWidth / 2 +
+          (index % 2 === 0 ? -horizontalStagger : horizontalStagger),
         y:
           options.centerY +
           Math.sin(angle) * (options.radiusY + layer * options.layerGapY) -
           options.nodeHeight / 2,
       };
+      const position = { ...base };
+      let attempt = 0;
+      const overlapsPlacedCard = () =>
+        placed.some(
+          (other) =>
+            position.x < other.x + options.nodeWidth + collisionGap &&
+            position.x + options.nodeWidth + collisionGap > other.x &&
+            position.y < other.y + options.nodeHeight + collisionGap &&
+            position.y + options.nodeHeight + collisionGap > other.y,
+        );
+      while (overlapsPlacedCard() && attempt < 20) {
+        attempt += 1;
+        const direction = (index + attempt) % 2 === 0 ? -1 : 1;
+        position.x =
+          base.x +
+          direction *
+            Math.ceil(attempt / 2) *
+            (options.nodeWidth + collisionGap);
+      }
+      positions[system._id] = position;
+      placed.push(position);
     });
   }
   return { positions, layers };

@@ -1797,6 +1797,8 @@ function layoutNodes(
       capacity,
       layerGapX: isCompressed ? 115 : 175,
       layerGapY: isCompressed ? 85 : 125,
+      horizontalStagger: isCompressed ? 68 : 86,
+      collisionGap: isCompressed ? 10 : 18,
     });
     Object.assign(positions, result.positions);
     return result.layers;
@@ -3848,7 +3850,12 @@ function ArchitectureContent() {
   // <ReactFlowProvider> wrapper).
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const handleFitAll = () => {
-    reactFlowRef.current?.fitView({ padding: 0.035, duration: 300 });
+    reactFlowRef.current?.fitView({
+      nodes: systems.map((system) => ({ id: system._id })),
+      padding: 0.08,
+      maxZoom: 1.05,
+      duration: 300,
+    });
   };
 
   const selectedSystem = useMemo(
@@ -4186,7 +4193,12 @@ function ArchitectureContent() {
     if (!cameraRequest || !reactFlowRef.current) return;
     const frame = requestAnimationFrame(() => {
       if (cameraRequest.kind === "all") {
-        reactFlowRef.current?.fitView({ padding: 0.035, duration: 300 });
+        reactFlowRef.current?.fitView({
+          nodes: systems.map((system) => ({ id: system._id })),
+          padding: 0.08,
+          maxZoom: 1.05,
+          duration: 300,
+        });
       } else {
         const nodeIds = systems
           .filter(
@@ -4775,11 +4787,16 @@ function ArchitectureContent() {
                   nodeTypes={nodeTypes}
                   edgeTypes={edgeTypes}
                   fitView
-                  fitViewOptions={{ padding: 0.035 }}
+                  fitViewOptions={{
+                    nodes: systems.map((system) => ({ id: system._id })),
+                    padding: 0.08,
+                    maxZoom: 1.05,
+                  }}
                   minZoom={0.08}
                   maxZoom={1.8}
                   onInit={(instance) => {
                     reactFlowRef.current = instance;
+                    setCameraRequest({ kind: "all" });
                   }}
                   attributionPosition="bottom-right"
                   proOptions={{ hideAttribution: true }}

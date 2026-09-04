@@ -206,4 +206,38 @@ describe("architecture orbit layout", () => {
     );
     expect(minimumDistance).toBeGreaterThan(70);
   });
+
+  it("stagger-resolves rectangular card collisions on a full orbit", () => {
+    const systems = Array.from({ length: 14 }, (_, index) => ({
+      _id: `card-${index}`,
+    }));
+    const result = placeSystemsOnEllipseLayers(systems, {
+      centerX: 650,
+      centerY: 500,
+      radiusX: 455,
+      radiusY: 330,
+      nodeWidth: 146,
+      nodeHeight: 132,
+      capacity: 14,
+      layerGapX: 175,
+      layerGapY: 125,
+      horizontalStagger: 86,
+      collisionGap: 18,
+    });
+    const cards = Object.values(result.positions);
+
+    for (let index = 0; index < cards.length; index += 1) {
+      for (
+        let otherIndex = index + 1;
+        otherIndex < cards.length;
+        otherIndex += 1
+      ) {
+        const a = cards[index];
+        const b = cards[otherIndex];
+        const overlapsX = a.x < b.x + 164 && a.x + 164 > b.x;
+        const overlapsY = a.y < b.y + 150 && a.y + 150 > b.y;
+        expect(overlapsX && overlapsY).toBe(false);
+      }
+    }
+  });
 });
