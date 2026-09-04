@@ -391,9 +391,9 @@ function systemIconFor(system: System) {
 const zoomSelector = (state: { transform: [number, number, number] }) =>
   state.transform[2];
 const COMPACT_ZOOM_THRESHOLD = 0.35;
-const SYSTEM_NODE_WIDTH = 150;
-const CORE_NODE_WIDTH = 210;
-const SYSTEM_NODE_HEIGHT = 72;
+const SYSTEM_NODE_WIDTH = 170;
+const CORE_NODE_WIDTH = 260;
+const SYSTEM_NODE_HEIGHT = 84;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
   const zoom = useStore(zoomSelector);
@@ -417,6 +417,10 @@ function SystemNode({ data }: NodeProps<NodeData>) {
     riskLabel,
   } = data;
   const meta = TYPE_META[s.type] ?? TYPE_META.core;
+  const groupAccent =
+    data.groupKey === "core"
+      ? "#8b5cf6"
+      : ECOSYSTEM_GROUPS[data.groupKey].accent;
   const statusMeta = STATUS_META[s.status] ?? STATUS_META.inactive;
   const healthColor = HEALTH_META[worstHealth]?.color ?? "#6b7280";
   const Icon = systemIconFor(s);
@@ -443,14 +447,14 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           width: nodeWidth,
           height: SYSTEM_NODE_HEIGHT,
           cursor: "pointer",
-          border: `${isSelected ? "2px" : "1px"} solid ${
-            isSelected ? "#fff" : isRiskMode ? riskColor : `${meta.border}cc`
+          border: `${isSelected ? "2px" : "1.5px"} solid ${
+            isSelected ? "#fff" : isRiskMode ? riskColor : `${groupAccent}dd`
           }`,
           boxShadow: isSelected
             ? `0 0 0 3px ${meta.border}55, 0 8px 24px #0008`
             : isCentral
-              ? `0 0 24px ${meta.border}22, 0 2px 10px #0006`
-              : "0 2px 10px #0007",
+              ? `0 0 28px ${groupAccent}38, 0 4px 14px #0008`
+              : `0 0 18px ${groupAccent}20, 0 3px 12px #0008`,
           padding: isCentral ? "10px 12px" : "8px 10px",
           transition: "all 0.15s",
         }}
@@ -484,8 +488,9 @@ function SystemNode({ data }: NodeProps<NodeData>) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: `${isRiskMode ? riskColor : meta.border}22`,
-              color: isRiskMode ? riskColor : meta.border,
+              background: `${isRiskMode ? riskColor : groupAccent}22`,
+              border: `1px solid ${isRiskMode ? riskColor : groupAccent}66`,
+              color: isRiskMode ? riskColor : groupAccent,
               flexShrink: 0,
             }}
           >
@@ -884,7 +889,7 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
       <div
         style={{
           position: "absolute",
-          top: 18,
+          top: 20,
           left: 42,
           right: 42,
           textAlign: "center",
@@ -893,8 +898,11 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
         <div
           style={{
             color: "#f5f3ff",
-            fontSize: 11,
+            maxWidth: 230,
+            margin: "0 auto",
+            fontSize: 16,
             fontWeight: 900,
+            lineHeight: 1.28,
             letterSpacing: 0.6,
             textTransform: "uppercase",
             textShadow: `0 0 18px ${data.accent}`,
@@ -902,7 +910,15 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
         >
           {data.title}
         </div>
-        <div style={{ marginTop: 4, color: "#c4b5fd", fontSize: 8 }}>
+        <div
+          style={{
+            maxWidth: 270,
+            margin: "7px auto 0",
+            color: "#c4b5fd",
+            fontSize: 9,
+            lineHeight: 1.35,
+          }}
+        >
           {data.hubCount} hub trung tâm · dữ liệu, kết nối và luồng vận hành
         </div>
       </div>
@@ -916,14 +932,34 @@ function ZoneConnector({ data }: NodeProps<ConnectorNodeData>) {
       aria-hidden="true"
       style={{
         width: data.length,
+        height: 1,
         borderTop: `1px dashed ${data.accent}`,
         filter: `drop-shadow(0 0 4px ${data.accent})`,
         opacity: 0.7,
         transform: `rotate(${data.angle}rad)`,
         transformOrigin: "0 0",
         pointerEvents: "none",
+        position: "relative",
       }}
-    />
+    >
+      {[0, data.length].map((left) => (
+        <span
+          key={left}
+          style={{
+            position: "absolute",
+            left,
+            top: 0,
+            width: 8,
+            height: 8,
+            borderRadius: 999,
+            background: "#071426",
+            border: `2px solid ${data.accent}`,
+            boxShadow: `0 0 12px ${data.accent}`,
+            transform: "translate(-50%, -55%)",
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -1107,7 +1143,7 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
             <div
               style={{
                 color: "#f8fafc",
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: 900,
                 lineHeight: 1.1,
                 letterSpacing: 0.3,
@@ -1127,7 +1163,7 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
               style={{
                 marginTop: 3,
                 color: "#94a3b8",
-                fontSize: 8,
+                fontSize: 9,
                 fontWeight: 500,
                 lineHeight: 1.2,
                 display: "-webkit-box",
@@ -1777,11 +1813,11 @@ function layoutNodes(
     positions,
     placeCoreSystemsZigZag(coreSystems, {
       centerX,
-      centerY,
+      centerY: centerY + (centralCount === 3 ? 22 : 12),
       nodeWidth: coreNodeWidth,
       nodeHeight,
-      horizontalOffset: isCompressed ? 82 : 95,
-      verticalGap: isCompressed ? 76 : 84,
+      horizontalOffset: isCompressed ? 82 : 42,
+      verticalGap: isCompressed ? 76 : 104,
     }),
   );
 
@@ -1810,15 +1846,15 @@ function layoutNodes(
   };
   const operationalLayers = placeRing(
     ringSystems.operational,
-    isCompressed ? 285 : 300,
-    isCompressed ? 210 : 205,
-    isCompressed ? 10 : 10,
+    isCompressed ? 285 : 370,
+    isCompressed ? 210 : 280,
+    isCompressed ? 10 : 8,
   );
   const outerLayers = placeRing(
     ringSystems.outer,
-    isCompressed ? 400 : 450,
-    isCompressed ? 290 : 300,
-    isCompressed ? 14 : 14,
+    isCompressed ? 400 : 520,
+    isCompressed ? 290 : 380,
+    isCompressed ? 14 : 12,
   );
 
   const calloutWidth = isCompressed ? 240 : 260;
@@ -1861,10 +1897,10 @@ function layoutNodes(
       id: "zone-core",
       title: "Lõi dữ liệu & điều phối hệ thống",
       subtitle: `${centralIds.size} hub trung tâm điều phối dữ liệu, kết nối và luồng vận hành`,
-      x: centerX - (centralCount > 1 ? 220 : 190),
-      y: centerY - (centralCount === 3 ? 190 : 170),
-      width: centralCount > 1 ? 440 : 380,
-      height: centralCount === 3 ? 380 : 340,
+      x: centerX - (centralCount > 1 ? 250 : 210),
+      y: centerY - (centralCount === 3 ? 220 : 190),
+      width: centralCount > 1 ? 500 : 420,
+      height: centralCount === 3 ? 440 : 380,
       accent: "#8b5cf6",
     },
     ...(
@@ -1887,20 +1923,20 @@ function layoutNodes(
   const orbits = [
     {
       id: "orbit-inner",
-      x: centerX - 300,
-      y: centerY - 205,
-      width: 600,
-      height: 410,
+      x: centerX - 370,
+      y: centerY - 280,
+      width: 740,
+      height: 560,
       accent: "#8b5cf699",
       dashed: true,
       glow: true,
     },
     {
       id: "orbit-outer",
-      x: centerX - 450,
-      y: centerY - 300,
-      width: 900,
-      height: 600,
+      x: centerX - 520,
+      y: centerY - 380,
+      width: 1040,
+      height: 760,
       accent: "#0ea5e966",
     },
   ];
@@ -3843,7 +3879,7 @@ function ArchitectureContent() {
   );
   const [showHelp, setShowHelp] = useState(false);
   const [showQuickRead, setShowQuickRead] = useState(false);
-  const [showMiniMap, setShowMiniMap] = useState(true);
+  const [showMiniMap, setShowMiniMap] = useState(false);
   const [cameraRequest, setCameraRequest] = useState<
     { kind: "all" } | { kind: "zone"; zoneKey: SystemZoneKey } | null
   >(null);
@@ -5243,6 +5279,10 @@ function ArchitectureContent() {
                         X/Y
                       </span>
                       Số kết nối vào / ra
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Database className="h-3.5 w-3.5 text-sky-300" />
+                      Số bản ghi hoặc module đang tích hợp
                     </span>
                   </div>
                   <Background color="#1e293b" gap={28} size={1} />

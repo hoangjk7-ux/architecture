@@ -110,15 +110,15 @@ describe("architecture orbit layout", () => {
       {
         centerX: 650,
         centerY: 430,
-        nodeWidth: 210,
-        nodeHeight: 72,
-        horizontalOffset: 95,
-        verticalGap: 84,
+        nodeWidth: 260,
+        nodeHeight: 84,
+        horizontalOffset: 42,
+        verticalGap: 104,
       },
     );
 
-    expect(positions["hub-1"].x).toBeLessThan(650 - 210 / 2);
-    expect(positions["hub-2"].x).toBeGreaterThan(650 - 210 / 2);
+    expect(positions["hub-1"].x).toBeLessThan(650 - 260 / 2);
+    expect(positions["hub-2"].x).toBeGreaterThan(650 - 260 / 2);
     expect(positions["hub-3"].x).toBe(positions["hub-1"].x);
     const cards = Object.values(positions);
     for (let index = 0; index < cards.length; index += 1) {
@@ -129,8 +129,8 @@ describe("architecture orbit layout", () => {
       ) {
         const a = cards[index];
         const b = cards[otherIndex];
-        const overlapsX = a.x < b.x + 210 && a.x + 210 > b.x;
-        const overlapsY = a.y < b.y + 72 && a.y + 72 > b.y;
+        const overlapsX = a.x < b.x + 260 && a.x + 260 > b.x;
+        const overlapsY = a.y < b.y + 84 && a.y + 84 > b.y;
         expect(overlapsX && overlapsY).toBe(false);
       }
     }
@@ -208,17 +208,17 @@ describe("architecture orbit layout", () => {
   });
 
   it("stagger-resolves rectangular card collisions on a full orbit", () => {
-    const systems = Array.from({ length: 10 }, (_, index) => ({
+    const systems = Array.from({ length: 8 }, (_, index) => ({
       _id: `card-${index}`,
     }));
     const result = placeSystemsOnEllipseLayers(systems, {
       centerX: 650,
       centerY: 430,
-      radiusX: 300,
-      radiusY: 205,
-      nodeWidth: 150,
-      nodeHeight: 72,
-      capacity: 10,
+      radiusX: 370,
+      radiusY: 280,
+      nodeWidth: 170,
+      nodeHeight: 84,
+      capacity: 8,
       layerGapX: 130,
       layerGapY: 95,
       horizontalStagger: 36,
@@ -234,8 +234,8 @@ describe("architecture orbit layout", () => {
       ) {
         const a = cards[index];
         const b = cards[otherIndex];
-        const overlapsX = a.x < b.x + 168 && a.x + 168 > b.x;
-        const overlapsY = a.y < b.y + 90 && a.y + 90 > b.y;
+        const overlapsX = a.x < b.x + 188 && a.x + 188 > b.x;
+        const overlapsY = a.y < b.y + 102 && a.y + 102 > b.y;
         expect(overlapsX && overlapsY).toBe(false);
       }
     }
