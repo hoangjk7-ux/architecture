@@ -172,6 +172,37 @@ export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
   return { positions, layers };
 }
 
+export function placeCoreSystemsZigZag<TSystem extends { _id: string }>(
+  systems: TSystem[],
+  options: {
+    centerX: number;
+    centerY: number;
+    nodeWidth: number;
+    nodeHeight: number;
+    horizontalOffset: number;
+    verticalGap: number;
+  },
+) {
+  const positions: Record<string, { x: number; y: number }> = {};
+  systems.forEach((system, index) => {
+    const offsetX =
+      systems.length === 1
+        ? 0
+        : index % 2 === 0
+          ? -options.horizontalOffset
+          : options.horizontalOffset;
+    positions[system._id] = {
+      x: options.centerX - options.nodeWidth / 2 + offsetX,
+      y:
+        options.centerY -
+        options.nodeHeight / 2 -
+        ((systems.length - 1) * options.verticalGap) / 2 +
+        index * options.verticalGap,
+    };
+  });
+  return positions;
+}
+
 export function buildIntegrationMetrics(
   integrations: ArchitectureIntegration[],
 ) {

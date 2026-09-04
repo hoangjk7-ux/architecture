@@ -5,6 +5,7 @@ import {
   buildArchitectureModel,
   classifyEcosystemGroup,
   normalizeArchitectureText,
+  placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
   systemZoneFor,
   toggleHiddenZone,
@@ -103,6 +104,38 @@ describe("architecture ecosystem classification", () => {
 });
 
 describe("architecture orbit layout", () => {
+  it("staggers core cards left and right without overlapping", () => {
+    const positions = placeCoreSystemsZigZag(
+      [{ _id: "hub-1" }, { _id: "hub-2" }, { _id: "hub-3" }],
+      {
+        centerX: 650,
+        centerY: 500,
+        nodeWidth: 172,
+        nodeHeight: 132,
+        horizontalOffset: 100,
+        verticalGap: 108,
+      },
+    );
+
+    expect(positions["hub-1"].x).toBeLessThan(650 - 172 / 2);
+    expect(positions["hub-2"].x).toBeGreaterThan(650 - 172 / 2);
+    expect(positions["hub-3"].x).toBe(positions["hub-1"].x);
+    const cards = Object.values(positions);
+    for (let index = 0; index < cards.length; index += 1) {
+      for (
+        let otherIndex = index + 1;
+        otherIndex < cards.length;
+        otherIndex += 1
+      ) {
+        const a = cards[index];
+        const b = cards[otherIndex];
+        const overlapsX = a.x < b.x + 172 && a.x + 172 > b.x;
+        const overlapsY = a.y < b.y + 132 && a.y + 132 > b.y;
+        expect(overlapsX && overlapsY).toBe(false);
+      }
+    }
+  });
+
   it("creates three hubs, business callouts and complete ring metadata", () => {
     const systems = Array.from({ length: 18 }, (_, index) =>
       system(`system-${index}`, {

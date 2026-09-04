@@ -96,6 +96,7 @@ import {
   architectureNodeDensity,
   buildArchitectureModel,
   classifyEcosystemGroup,
+  placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
   systemZoneFor,
   toggleHiddenZone,
@@ -390,6 +391,9 @@ function systemIconFor(system: System) {
 const zoomSelector = (state: { transform: [number, number, number] }) =>
   state.transform[2];
 const COMPACT_ZOOM_THRESHOLD = 0.35;
+const SYSTEM_NODE_WIDTH = 146;
+const CORE_NODE_WIDTH = 172;
+const SYSTEM_NODE_HEIGHT = 132;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
   const zoom = useStore(zoomSelector);
@@ -411,7 +415,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   const statusMeta = STATUS_META[s.status] ?? STATUS_META.inactive;
   const healthColor = HEALTH_META[worstHealth]?.color ?? "#6b7280";
   const Icon = systemIconFor(s);
-  const nodeWidth = isCentral ? 172 : 146;
+  const nodeWidth = isCentral ? CORE_NODE_WIDTH : SYSTEM_NODE_WIDTH;
   const iconSize = isCentral ? 22 : 20;
   const nodeBorder = isRiskMode ? riskColor : meta.border;
   const nodeBg = isRiskMode
@@ -431,8 +435,8 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         style={{
           background: isRiskMode ? "#0f172acc" : "#0b1222dd",
           borderRadius: 12,
-          width: isCentral ? 132 : 112,
-          minHeight: 50,
+          width: isCentral ? 148 : 128,
+          minHeight: 56,
           cursor: "pointer",
           border: `${isSelected ? "2px" : "1px"} solid ${
             isSelected ? "#fff" : isRiskMode ? riskColor : `${meta.border}cc`
@@ -545,6 +549,8 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         background: nodeBg,
         borderRadius: 10,
         width: nodeWidth,
+        height: SYSTEM_NODE_HEIGHT,
+        overflow: "hidden",
         cursor: "pointer",
         border: `${isSelected ? "2.5px" : "1.5px"} solid ${isSelected ? "#fff" : nodeBorder}`,
         boxShadow: isSelected
@@ -1758,19 +1764,21 @@ function layoutNodes(
   // canvas back into a collection of large background rectangles.
   const centerX = isCompressed ? 470 : 650;
   const centerY = isCompressed ? 360 : 500;
-  const nodeWidth = isCompressed ? 132 : 172;
-  const nodeHeight = isCompressed ? 50 : 86;
-  const hubGap = isCompressed ? 62 : 98;
-
-  sorted
-    .filter((system) => centralIds.has(system._id))
-    .forEach((system, index) => {
-      ringBySystem[system._id] = "core";
-      positions[system._id] = {
-        x: centerX - nodeWidth / 2,
-        y: centerY - ((centralCount - 1) * hubGap) / 2 + index * hubGap,
-      };
-    });
+  const coreNodeWidth = isCompressed ? 148 : CORE_NODE_WIDTH;
+  const satelliteNodeWidth = isCompressed ? 128 : SYSTEM_NODE_WIDTH;
+  const nodeHeight = isCompressed ? 64 : SYSTEM_NODE_HEIGHT;
+  const coreSystems = sorted.filter((system) => centralIds.has(system._id));
+  Object.assign(
+    positions,
+    placeCoreSystemsZigZag(coreSystems, {
+      centerX,
+      centerY,
+      nodeWidth: coreNodeWidth,
+      nodeHeight,
+      horizontalOffset: isCompressed ? 82 : 100,
+      verticalGap: isCompressed ? 76 : 108,
+    }),
+  );
 
   const ringSystems = { operational, outer };
   const placeRing = (
@@ -1784,7 +1792,7 @@ function layoutNodes(
       centerY,
       radiusX,
       radiusY,
-      nodeWidth,
+      nodeWidth: satelliteNodeWidth,
       nodeHeight,
       capacity,
       layerGapX: isCompressed ? 115 : 175,
@@ -1847,10 +1855,10 @@ function layoutNodes(
       id: "zone-core",
       title: "Lõi dữ liệu & điều phối hệ thống",
       subtitle: `${centralIds.size} hub trung tâm điều phối dữ liệu, kết nối và luồng vận hành`,
-      x: centerX - 180 * scale,
-      y: centerY - 145 * scale,
-      width: 360 * scale,
-      height: 290 * scale,
+      x: centerX - (centralCount > 1 ? 250 : 200),
+      y: centerY - (centralCount === 3 ? 240 : 200),
+      width: centralCount > 1 ? 500 : 400,
+      height: centralCount === 3 ? 480 : 400,
       accent: "#8b5cf6",
     },
     ...(
@@ -4120,8 +4128,8 @@ function ArchitectureContent() {
           // Reserve the detailed card's maximum footprint even while the mini
           // visual is rendered. React Flow then keeps identical bounds and
           // edge anchors when semantic zoom switches content density.
-          width: isCentral ? 172 : 146,
-          height: 150,
+          width: isCentral ? CORE_NODE_WIDTH : SYSTEM_NODE_WIDTH,
+          height: SYSTEM_NODE_HEIGHT,
           opacity: selectedId
             ? connectedNodeIds!.has(s._id)
               ? 1
