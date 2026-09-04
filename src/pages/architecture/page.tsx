@@ -401,9 +401,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   // Overview is an infographic: zoom changes scale only, never card density.
   // Details live in the inspector after selection, so cards cannot suddenly
   // grow and collide while the user zooms the canvas.
-  const density = data.isMini
-    ? "mini"
-    : architectureNodeDensity(zoom, data.isMini);
+  const density = architectureNodeDensity(zoom, data.isMini);
   const isCompact = density !== "detailed";
   const {
     system: s,
@@ -518,7 +516,6 @@ function SystemNode({ data }: NodeProps<NodeData>) {
                 marginTop: 3,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
                 gap: 4,
                 color: "#94a3b8",
                 fontSize: 8,
@@ -545,9 +542,6 @@ function SystemNode({ data }: NodeProps<NodeData>) {
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                   {isRiskMode ? riskLabel : HEALTH_META[worstHealth]?.label}
                 </span>
-              </span>
-              <span style={{ flexShrink: 0 }}>
-                {inCount}/{outCount}
               </span>
             </div>
           </div>
@@ -866,6 +860,8 @@ function OrbitNode({ data }: NodeProps<OrbitNodeData>) {
 }
 
 function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
+  const zoom = useStore(zoomSelector);
+  const showMetadata = zoom >= COMPACT_ZOOM_THRESHOLD;
   return (
     <div
       aria-label={data.title}
@@ -913,17 +909,19 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
         >
           {data.title}
         </div>
-        <div
-          style={{
-            maxWidth: 270,
-            margin: "9px auto 0",
-            color: "#c4b5fd",
-            fontSize: 10,
-            lineHeight: 1.35,
-          }}
-        >
-          {data.hubCount} hub trung tâm · dữ liệu, kết nối và luồng vận hành
-        </div>
+        {showMetadata && (
+          <div
+            style={{
+              maxWidth: 270,
+              margin: "9px auto 0",
+              color: "#c4b5fd",
+              fontSize: 10,
+              lineHeight: 1.35,
+            }}
+          >
+            {data.hubCount} hub trung tâm · dữ liệu, kết nối và luồng vận hành
+          </div>
+        )}
       </div>
     </div>
   );
@@ -967,7 +965,9 @@ function ZoneConnector({ data }: NodeProps<ConnectorNodeData>) {
 }
 
 function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
-  if (data.isPlaceholder) {
+  const zoom = useStore(zoomSelector);
+  const isDistant = zoom < COMPACT_ZOOM_THRESHOLD;
+  if (data.isPlaceholder && !isDistant) {
     // Checked before isMiniZone: the default (no selection) view *is*
     // compact mode (see isOverviewCompressed), so an empty zone's rich
     // "here's what belongs here" card must render there too, not only
@@ -1097,7 +1097,7 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
     );
   }
 
-  if (data.isMiniZone) {
+  if (data.isMiniZone || isDistant) {
     const Icon = data.icon;
     return (
       <div
@@ -1161,21 +1161,6 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
               title={data.title}
             >
               {data.title}
-            </div>
-            <div
-              style={{
-                marginTop: 3,
-                color: "#94a3b8",
-                fontSize: 9,
-                fontWeight: 500,
-                lineHeight: 1.2,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {data.subtitle}
             </div>
           </div>
         </div>
@@ -1400,7 +1385,8 @@ function GlowEdge({
   // Below this zoom, edge labels are unreadable anyway and just add noise
   // to an already-dense set of crossing lines — hide instead of rendering
   // illegible 8px text (.ai/architecture-overview-ux-review.md, P1.2).
-  const showLabel = label && zoom >= COMPACT_ZOOM_THRESHOLD;
+  const showLabel =
+    label && (zoom >= COMPACT_ZOOM_THRESHOLD || Boolean(data?.isDetailFocused));
 
   return (
     <>
@@ -3902,6 +3888,7 @@ function ArchitectureContent() {
   const [showHelp, setShowHelp] = useState(false);
   const [showQuickRead, setShowQuickRead] = useState(false);
   const [showMiniMap, setShowMiniMap] = useState(false);
+  const [isDistantZoom, setIsDistantZoom] = useState(true);
   const [cameraRequest, setCameraRequest] = useState<
     { kind: "all" } | { kind: "zone"; zoneKey: SystemZoneKey } | null
   >(null);
@@ -3911,6 +3898,7 @@ function ArchitectureContent() {
   // subtree (useReactFlow() only works inside it without a separate
   // <ReactFlowProvider> wrapper).
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
+  const isDistantZoomRef = useRef(true);
   const overviewFitNodes = useMemo(
     () => [
       ...systems.map((system) => ({ id: system._id })),
@@ -4149,7 +4137,7 @@ function ArchitectureContent() {
             accent: zone.accent,
             isCore,
             isPlaceholder: Boolean(zone.isPlaceholder),
-            isMiniZone: isOverviewCompressed,
+            isMiniZone: false,
             icon: zone.icon,
             examples: zone.examples,
             ...(isCore ? { hubCount: architectureLayout.centralIds.size } : {}),
@@ -4201,9 +4189,8 @@ function ArchitectureContent() {
           riskTone: riskTone.tone,
           riskColor: riskTone.color,
           riskLabel: riskTone.label,
-          // The canvas remains a readable infographic at every zoom level;
-          // complete system details are shown in the inspector on selection.
-          isMini: true,
+          // Geometry remains fixed; content density follows React Flow zoom.
+          isMini: isOverviewCompressed,
         },
         style: {
           // Reserve the detailed card's maximum footprint even while the mini
@@ -4374,14 +4361,21 @@ function ArchitectureContent() {
           type: "glow",
           label: isHiddenEdge
             ? undefined
-            : selectedId && isFocused
+            : selectedIntegrationId === intg._id
               ? `${intg.protocol} · ${
                   METHOD_META[intg.method]?.label ?? intg.method
                 }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
-              : edgeFocus !== "all" || (mapMode === "risk" && isRiskEdge)
-                ? (METHOD_META[intg.method]?.label ?? intg.method)
-                : undefined,
-          data: { isHighCritical: intg.criticalLevel === "high" },
+              : selectedId && isFocused
+                ? `${intg.protocol} · ${
+                    METHOD_META[intg.method]?.label ?? intg.method
+                  }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
+                : edgeFocus !== "all" || (mapMode === "risk" && isRiskEdge)
+                  ? (METHOD_META[intg.method]?.label ?? intg.method)
+                  : undefined,
+          data: {
+            isHighCritical: intg.criticalLevel === "high",
+            isDetailFocused: selectedIntegrationId === intg._id,
+          },
           style: {
             stroke: hc.color,
             strokeWidth:
@@ -4395,7 +4389,8 @@ function ArchitectureContent() {
             strokeDasharray: !intg.isArchitectureCompliant ? "6,4" : undefined,
             opacity: edgeOpacity,
           },
-          animated: !isHiddenEdge && intg.method === "realtime",
+          animated:
+            !isDistantZoom && !isHiddenEdge && intg.method === "realtime",
           hidden: isHiddenEdge,
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -4417,6 +4412,7 @@ function ArchitectureContent() {
       architectureLayout.centralIds,
       hiddenZoneKeys,
       systemGroupMap,
+      isDistantZoom,
     ],
   );
 
@@ -4551,24 +4547,37 @@ function ArchitectureContent() {
     (filterType !== "all" ? 1 : 0) +
     (edgeFocus !== "all" ? 1 : 0);
 
-  const hasMapFocus =
+  const activeFilterCriteria = [
+    filterHealth !== "all" ? `Sức khoẻ: ${t(`health.${filterHealth}`)}` : null,
+    filterType !== "all" ? `Loại: ${t(`systemType.${filterType}`)}` : null,
+    edgeFocus !== "all"
+      ? `Luồng: ${
+          {
+            critical: "Critical",
+            issues: "Có lỗi",
+            nonCompliant: "Sai chuẩn",
+            realtime: "Realtime",
+          }[edgeFocus]
+        }`
+      : null,
+  ].filter((criterion): criterion is string => criterion !== null);
+
+  const hasActiveMapCriteria =
     selectedId !== null ||
     selectedIntegrationId !== null ||
     selectedZoneKey !== null ||
     filterType !== "all" ||
     filterHealth !== "all" ||
     edgeFocus !== "all" ||
-    mapMode !== "ecosystem" ||
     hiddenZoneKeys.size > 0;
 
-  const handleClearMapFocus = () => {
+  const handleClearMapCriteria = () => {
     setSelectedId(null);
     setSelectedIntegrationId(null);
     setSelectedZoneKey(null);
     setFilterType("all");
     setFilterHealth("all");
     setEdgeFocus("all");
-    setMapMode("ecosystem");
     setHiddenZoneKeys(new Set());
     setCameraRequest({ kind: "all" });
   };
@@ -4635,7 +4644,11 @@ function ArchitectureContent() {
         {/* Architecture Map filters */}
         {viewTab === "map" && (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-0.5">
+            <div
+              role="group"
+              aria-label="Lens bản đồ"
+              className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-0.5"
+            >
               {(
                 [
                   ["ecosystem", "Hệ sinh thái"],
@@ -4645,6 +4658,8 @@ function ArchitectureContent() {
                 <button
                   key={mode}
                   onClick={() => setMapMode(mode)}
+                  aria-pressed={mapMode === mode}
+                  aria-label={`Lens: ${label}`}
                   className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                     mapMode === mode
                       ? "bg-background text-foreground shadow-sm"
@@ -4665,7 +4680,14 @@ function ArchitectureContent() {
             </button>
             <Popover>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+                <button
+                  aria-label={
+                    activeFilterCount > 0
+                      ? `Bộ lọc, ${activeFilterCount} điều kiện đang áp dụng: ${activeFilterCriteria.join(", ")}`
+                      : "Bộ lọc, chưa có điều kiện"
+                  }
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                >
                   <SlidersHorizontal className="h-3 w-3" />
                   Bộ lọc
                   {activeFilterCount > 0 && (
@@ -4677,7 +4699,7 @@ function ArchitectureContent() {
               </PopoverTrigger>
               <PopoverContent
                 align="start"
-                className="w-[360px] bg-slate-950/95 border-slate-700 text-slate-200"
+                className="w-[min(360px,calc(100vw-2rem))] bg-slate-950/95 border-slate-700 text-slate-200"
               >
                 <div className="space-y-3">
                   <div>
@@ -4695,6 +4717,7 @@ function ArchitectureContent() {
                             onClick={() =>
                               setFilterHealth(filterHealth === h ? "all" : h)
                             }
+                            aria-pressed={filterHealth === h}
                             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
                             style={{
                               background:
@@ -4733,6 +4756,7 @@ function ArchitectureContent() {
                         <button
                           key={ft}
                           onClick={() => setFilterType(ft)}
+                          aria-pressed={filterType === ft}
                           className="px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
                           style={{
                             background:
@@ -4766,6 +4790,7 @@ function ArchitectureContent() {
                         <button
                           key={key}
                           onClick={() => setEdgeFocus(key)}
+                          aria-pressed={edgeFocus === key}
                           className="px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer border transition-all"
                           style={{
                             background:
@@ -4783,6 +4808,14 @@ function ArchitectureContent() {
                 </div>
               </PopoverContent>
             </Popover>
+            {activeFilterCriteria.length > 0 && (
+              <span
+                className="hidden max-w-[260px] truncate text-[10px] text-muted-foreground xl:inline"
+                title={activeFilterCriteria.join(" · ")}
+              >
+                {activeFilterCriteria.join(" · ")}
+              </span>
+            )}
             {selectedId && (
               <button
                 onClick={() => setSelectedId(null)}
@@ -4793,18 +4826,19 @@ function ArchitectureContent() {
             )}
             {selectedZoneKey && (
               <button
-                onClick={() => setSelectedZoneKey(null)}
+                onClick={() => handleSetSelectedZone(selectedZoneKey)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border border-orange-400/40 text-orange-200 hover:text-orange-100 cursor-pointer transition-colors"
               >
                 <X className="h-3 w-3" /> Xoá cụm
               </button>
             )}
-            {hasMapFocus && (
+            {hasActiveMapCriteria && (
               <button
-                onClick={handleClearMapFocus}
+                onClick={handleClearMapCriteria}
+                aria-label="Xoá focus, bộ lọc và thiết lập hiển thị; giữ nguyên lens"
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs border border-slate-500/50 bg-slate-900/60 text-slate-200 hover:text-white cursor-pointer transition-colors"
               >
-                <X className="h-3 w-3" /> Xoá tất cả
+                <X className="h-3 w-3" /> Xoá điều kiện
               </button>
             )}
           </div>
@@ -4883,6 +4917,14 @@ function ArchitectureContent() {
                     reactFlowRef.current = instance;
                     setCameraRequest({ kind: "all" });
                   }}
+                  onMove={(_event, viewport) => {
+                    const nextIsDistant =
+                      viewport.zoom < COMPACT_ZOOM_THRESHOLD;
+                    if (isDistantZoomRef.current !== nextIsDistant) {
+                      isDistantZoomRef.current = nextIsDistant;
+                      setIsDistantZoom(nextIsDistant);
+                    }
+                  }}
                   attributionPosition="bottom-right"
                   proOptions={{ hideAttribution: true }}
                   onNodeClick={(_evt, node) => {
@@ -4903,6 +4945,7 @@ function ArchitectureContent() {
                       <PopoverTrigger asChild>
                         <button
                           title="Cách đọc sơ đồ"
+                          aria-label="Mở hướng dẫn và chú giải sơ đồ"
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-950/85 text-slate-300 shadow-lg backdrop-blur hover:text-white cursor-pointer transition-colors"
                         >
                           <Info className="h-3.5 w-3.5" />
@@ -4910,7 +4953,7 @@ function ArchitectureContent() {
                       </PopoverTrigger>
                       <PopoverContent
                         align="start"
-                        className="w-[300px] bg-slate-950/95 border-slate-700 text-[10px] text-slate-300"
+                        className="w-[min(300px,calc(100vw-2rem))] bg-slate-950/95 border-slate-700 text-[10px] text-slate-300"
                       >
                         <div className="mb-1 font-semibold text-slate-100">
                           {mapMode === "risk"
@@ -5023,16 +5066,18 @@ function ArchitectureContent() {
                     </Popover>
                   </div>
                   <div
-                    className={`absolute right-4 top-4 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 text-slate-200 shadow-lg backdrop-blur ${showQuickRead ? "max-h-[calc(100%-240px)] w-[270px] overflow-y-auto p-3" : "p-2"}`}
+                    className={`absolute right-2 top-2 z-10 rounded-xl border border-slate-700/80 bg-slate-950/85 text-slate-200 shadow-lg backdrop-blur sm:right-4 sm:top-4 ${showQuickRead ? "max-h-[calc(100%-7rem)] w-[min(270px,calc(100%-1rem))] overflow-y-auto p-3 sm:max-h-[calc(100%-10rem)] sm:w-[270px]" : "p-2"}`}
                   >
                     <button
                       onClick={() => setShowQuickRead((v) => !v)}
+                      aria-expanded={showQuickRead}
+                      aria-controls="architecture-quick-read-content"
                       className={`flex cursor-pointer items-center gap-2 ${showQuickRead ? "w-full justify-between" : "justify-center"}`}
                       title={showQuickRead ? "Thu gọn" : "Mở rộng"}
                       aria-label={
                         showQuickRead
-                          ? "Thu gọn đọc nhanh hệ sinh thái"
-                          : "Mở đọc nhanh hệ sinh thái"
+                          ? `Thu gọn đọc nhanh ${mapMode === "risk" ? "rủi ro" : "hệ sinh thái"}`
+                          : `Mở đọc nhanh ${mapMode === "risk" ? "rủi ro" : "hệ sinh thái"}`
                       }
                     >
                       {showQuickRead ? (
@@ -5065,7 +5110,7 @@ function ArchitectureContent() {
                       </div>
                     </button>
                     {showQuickRead && (
-                      <>
+                      <div id="architecture-quick-read-content">
                         {mapMode === "risk" ? (
                           <div className="grid grid-cols-2 gap-2 text-[10px]">
                             <div className="rounded-lg border border-red-400/20 bg-red-400/10 p-2">
@@ -5152,6 +5197,7 @@ function ArchitectureContent() {
                           <div className="flex flex-wrap gap-1.5">
                             <button
                               onClick={() => handleSetSelectedZone("core")}
+                              aria-pressed={selectedZoneKey === "core"}
                               className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
                               style={{
                                 borderColor:
@@ -5184,6 +5230,7 @@ function ArchitectureContent() {
                                 <button
                                   key={key}
                                   onClick={() => handleSetSelectedZone(key)}
+                                  aria-pressed={selectedZoneKey === key}
                                   className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
                                   style={{
                                     borderColor:
@@ -5223,6 +5270,8 @@ function ArchitectureContent() {
                           <div className="flex flex-wrap gap-1.5">
                             <button
                               onClick={() => handleToggleZoneVisibility("core")}
+                              aria-pressed={!hiddenZoneKeys.has("core")}
+                              aria-label={`${hiddenZoneKeys.has("core") ? "Hiện" : "Ẩn"} cụm Trung tâm`}
                               className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
                               style={{
                                 borderColor: hiddenZoneKeys.has("core")
@@ -5237,7 +5286,7 @@ function ArchitectureContent() {
                                 opacity: hiddenZoneKeys.has("core") ? 0.75 : 1,
                               }}
                             >
-                              {hiddenZoneKeys.has("core") ? "Ẩn" : "Hiện"} ·
+                              {hiddenZoneKeys.has("core") ? "Hiện" : "Ẩn"} ·
                               Trung tâm
                             </button>
                             {(
@@ -5257,6 +5306,8 @@ function ArchitectureContent() {
                                   onClick={() =>
                                     handleToggleZoneVisibility(key)
                                   }
+                                  aria-pressed={!isHidden}
+                                  aria-label={`${isHidden ? "Hiện" : "Ẩn"} cụm ${group.title}`}
                                   className="rounded-full border px-2 py-1 text-[10px] font-medium transition-colors"
                                   style={{
                                     borderColor: isHidden
@@ -5269,14 +5320,14 @@ function ArchitectureContent() {
                                     opacity: isHidden ? 0.75 : 1,
                                   }}
                                 >
-                                  {isHidden ? "Ẩn" : "Hiện"} ·{" "}
+                                  {isHidden ? "Hiện" : "Ẩn"} ·{" "}
                                   {group.title.split(" & ")[0]}
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                   <div className="absolute left-1/2 bottom-4 z-10 flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-xl border border-slate-700/80 bg-slate-950/85 px-4 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
