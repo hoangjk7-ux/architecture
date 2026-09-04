@@ -391,13 +391,18 @@ function systemIconFor(system: System) {
 const zoomSelector = (state: { transform: [number, number, number] }) =>
   state.transform[2];
 const COMPACT_ZOOM_THRESHOLD = 0.35;
-const SYSTEM_NODE_WIDTH = 146;
-const CORE_NODE_WIDTH = 172;
-const SYSTEM_NODE_HEIGHT = 132;
+const SYSTEM_NODE_WIDTH = 150;
+const CORE_NODE_WIDTH = 210;
+const SYSTEM_NODE_HEIGHT = 72;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
   const zoom = useStore(zoomSelector);
-  const density = architectureNodeDensity(zoom, data.isMini);
+  // Overview is an infographic: zoom changes scale only, never card density.
+  // Details live in the inspector after selection, so cards cannot suddenly
+  // grow and collide while the user zooms the canvas.
+  const density = data.isMini
+    ? "mini"
+    : architectureNodeDensity(zoom, data.isMini);
   const isCompact = density !== "detailed";
   const {
     system: s,
@@ -435,8 +440,8 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         style={{
           background: isRiskMode ? "#0f172acc" : "#0b1222dd",
           borderRadius: 12,
-          width: isCentral ? 148 : 128,
-          minHeight: 56,
+          width: nodeWidth,
+          height: SYSTEM_NODE_HEIGHT,
           cursor: "pointer",
           border: `${isSelected ? "2px" : "1px"} solid ${
             isSelected ? "#fff" : isRiskMode ? riskColor : `${meta.border}cc`
@@ -446,7 +451,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             : isCentral
               ? `0 0 24px ${meta.border}22, 0 2px 10px #0006`
               : "0 2px 10px #0007",
-          padding: "7px 8px",
+          padding: isCentral ? "10px 12px" : "8px 10px",
           transition: "all 0.15s",
         }}
       >
@@ -1763,7 +1768,7 @@ function layoutNodes(
   // preserve the business grouping from the reference without turning the
   // canvas back into a collection of large background rectangles.
   const centerX = isCompressed ? 470 : 650;
-  const centerY = isCompressed ? 360 : 500;
+  const centerY = isCompressed ? 360 : 430;
   const coreNodeWidth = isCompressed ? 148 : CORE_NODE_WIDTH;
   const satelliteNodeWidth = isCompressed ? 128 : SYSTEM_NODE_WIDTH;
   const nodeHeight = isCompressed ? 64 : SYSTEM_NODE_HEIGHT;
@@ -1775,8 +1780,8 @@ function layoutNodes(
       centerY,
       nodeWidth: coreNodeWidth,
       nodeHeight,
-      horizontalOffset: isCompressed ? 82 : 100,
-      verticalGap: isCompressed ? 76 : 108,
+      horizontalOffset: isCompressed ? 82 : 95,
+      verticalGap: isCompressed ? 76 : 84,
     }),
   );
 
@@ -1795,9 +1800,9 @@ function layoutNodes(
       nodeWidth: satelliteNodeWidth,
       nodeHeight,
       capacity,
-      layerGapX: isCompressed ? 115 : 175,
-      layerGapY: isCompressed ? 85 : 125,
-      horizontalStagger: isCompressed ? 68 : 86,
+      layerGapX: isCompressed ? 115 : 130,
+      layerGapY: isCompressed ? 85 : 95,
+      horizontalStagger: isCompressed ? 68 : 36,
       collisionGap: isCompressed ? 10 : 18,
     });
     Object.assign(positions, result.positions);
@@ -1805,20 +1810,19 @@ function layoutNodes(
   };
   const operationalLayers = placeRing(
     ringSystems.operational,
-    isCompressed ? 285 : 455,
-    isCompressed ? 210 : 330,
-    isCompressed ? 10 : 14,
+    isCompressed ? 285 : 300,
+    isCompressed ? 210 : 205,
+    isCompressed ? 10 : 10,
   );
   const outerLayers = placeRing(
     ringSystems.outer,
-    isCompressed ? 400 : 620,
-    isCompressed ? 290 : 455,
-    isCompressed ? 14 : 18,
+    isCompressed ? 400 : 450,
+    isCompressed ? 290 : 300,
+    isCompressed ? 14 : 14,
   );
 
-  const scale = isCompressed ? 1 : 1.38;
-  const calloutWidth = isCompressed ? 240 : 300;
-  const calloutHeight = isCompressed ? 74 : 96;
+  const calloutWidth = isCompressed ? 240 : 260;
+  const calloutHeight = isCompressed ? 74 : 88;
   const groupCounts = new globalThis.Map<EcosystemGroupKey, number>();
   satellites.forEach((system) => {
     const key = classifyEcosystemGroup(system);
@@ -1828,28 +1832,28 @@ function layoutNodes(
   const calloutPositions: Record<EcosystemGroupKey, { x: number; y: number }> =
     {
       workspace: {
-        x: centerX - 570 * scale - denseOffset,
-        y: centerY - 310 * scale - denseOffset / 2,
+        x: 20 - denseOffset,
+        y: 20 - denseOffset / 2,
       },
       learning: {
-        x: centerX + 330 * scale + denseOffset,
-        y: centerY - 310 * scale - denseOffset / 2,
+        x: 1020 + denseOffset,
+        y: 20 - denseOffset / 2,
       },
       platform: {
-        x: centerX - 590 * scale - denseOffset,
-        y: centerY + 205 * scale + denseOffset / 2,
+        x: 20 - denseOffset,
+        y: 650 + denseOffset / 2,
       },
       pilot: {
         x: centerX - calloutWidth / 2,
-        y: centerY + 305 * scale + denseOffset,
+        y: 760 + denseOffset,
       },
       automation: {
-        x: centerX + 260 * scale + denseOffset,
-        y: centerY + 215 * scale + denseOffset / 2,
+        x: 780 + denseOffset,
+        y: 650 + denseOffset / 2,
       },
       legacy: {
-        x: centerX + 455 * scale + denseOffset,
-        y: centerY + 130 * scale + denseOffset / 2,
+        x: 1060 + denseOffset,
+        y: 650 + denseOffset / 2,
       },
     };
   const zones: ArchitectureZone[] = [
@@ -1857,10 +1861,10 @@ function layoutNodes(
       id: "zone-core",
       title: "Lõi dữ liệu & điều phối hệ thống",
       subtitle: `${centralIds.size} hub trung tâm điều phối dữ liệu, kết nối và luồng vận hành`,
-      x: centerX - (centralCount > 1 ? 250 : 200),
-      y: centerY - (centralCount === 3 ? 240 : 200),
-      width: centralCount > 1 ? 500 : 400,
-      height: centralCount === 3 ? 480 : 400,
+      x: centerX - (centralCount > 1 ? 220 : 190),
+      y: centerY - (centralCount === 3 ? 190 : 170),
+      width: centralCount > 1 ? 440 : 380,
+      height: centralCount === 3 ? 380 : 340,
       accent: "#8b5cf6",
     },
     ...(
@@ -1883,20 +1887,20 @@ function layoutNodes(
   const orbits = [
     {
       id: "orbit-inner",
-      x: centerX - 285 * scale,
-      y: centerY - 210 * scale,
-      width: 570 * scale,
-      height: 420 * scale,
+      x: centerX - 300,
+      y: centerY - 205,
+      width: 600,
+      height: 410,
       accent: "#8b5cf699",
       dashed: true,
       glow: true,
     },
     {
       id: "orbit-outer",
-      x: centerX - 400 * scale,
-      y: centerY - 290 * scale,
-      width: 800 * scale,
-      height: 580 * scale,
+      x: centerX - 450,
+      y: centerY - 300,
+      width: 900,
+      height: 600,
       accent: "#0ea5e966",
     },
   ];
@@ -3849,11 +3853,21 @@ function ArchitectureContent() {
   // subtree (useReactFlow() only works inside it without a separate
   // <ReactFlowProvider> wrapper).
   const reactFlowRef = useRef<ReactFlowInstance | null>(null);
+  const overviewFitNodes = useMemo(
+    () => [
+      ...systems.map((system) => ({ id: system._id })),
+      { id: "zone-core" },
+      ...(Object.keys(ECOSYSTEM_GROUPS) as EcosystemGroupKey[]).map((key) => ({
+        id: `zone-${key}`,
+      })),
+    ],
+    [systems],
+  );
   const handleFitAll = () => {
     reactFlowRef.current?.fitView({
-      nodes: systems.map((system) => ({ id: system._id })),
-      padding: 0.08,
-      maxZoom: 1.05,
+      nodes: overviewFitNodes,
+      padding: 0.025,
+      maxZoom: 1,
       duration: 300,
     });
   };
@@ -4129,7 +4143,9 @@ function ArchitectureContent() {
           riskTone: riskTone.tone,
           riskColor: riskTone.color,
           riskLabel: riskTone.label,
-          isMini: isOverviewCompressed,
+          // The canvas remains a readable infographic at every zoom level;
+          // complete system details are shown in the inspector on selection.
+          isMini: true,
         },
         style: {
           // Reserve the detailed card's maximum footprint even while the mini
@@ -4194,9 +4210,9 @@ function ArchitectureContent() {
     const frame = requestAnimationFrame(() => {
       if (cameraRequest.kind === "all") {
         reactFlowRef.current?.fitView({
-          nodes: systems.map((system) => ({ id: system._id })),
-          padding: 0.08,
-          maxZoom: 1.05,
+          nodes: overviewFitNodes,
+          padding: 0.025,
+          maxZoom: 1,
           duration: 300,
         });
       } else {
@@ -4218,7 +4234,14 @@ function ArchitectureContent() {
       setCameraRequest(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [cameraRequest, hiddenZoneKeys, nodes, systemGroupMap, systems]);
+  }, [
+    cameraRequest,
+    hiddenZoneKeys,
+    nodes,
+    overviewFitNodes,
+    systemGroupMap,
+    systems,
+  ]);
 
   const edges: Edge[] = useMemo(
     () =>
@@ -4788,9 +4811,9 @@ function ArchitectureContent() {
                   edgeTypes={edgeTypes}
                   fitView
                   fitViewOptions={{
-                    nodes: systems.map((system) => ({ id: system._id })),
-                    padding: 0.08,
-                    maxZoom: 1.05,
+                    nodes: overviewFitNodes,
+                    padding: 0.025,
+                    maxZoom: 1,
                   }}
                   minZoom={0.08}
                   maxZoom={1.8}

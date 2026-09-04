@@ -109,16 +109,16 @@ describe("architecture orbit layout", () => {
       [{ _id: "hub-1" }, { _id: "hub-2" }, { _id: "hub-3" }],
       {
         centerX: 650,
-        centerY: 500,
-        nodeWidth: 172,
-        nodeHeight: 132,
-        horizontalOffset: 100,
-        verticalGap: 108,
+        centerY: 430,
+        nodeWidth: 210,
+        nodeHeight: 72,
+        horizontalOffset: 95,
+        verticalGap: 84,
       },
     );
 
-    expect(positions["hub-1"].x).toBeLessThan(650 - 172 / 2);
-    expect(positions["hub-2"].x).toBeGreaterThan(650 - 172 / 2);
+    expect(positions["hub-1"].x).toBeLessThan(650 - 210 / 2);
+    expect(positions["hub-2"].x).toBeGreaterThan(650 - 210 / 2);
     expect(positions["hub-3"].x).toBe(positions["hub-1"].x);
     const cards = Object.values(positions);
     for (let index = 0; index < cards.length; index += 1) {
@@ -129,8 +129,8 @@ describe("architecture orbit layout", () => {
       ) {
         const a = cards[index];
         const b = cards[otherIndex];
-        const overlapsX = a.x < b.x + 172 && a.x + 172 > b.x;
-        const overlapsY = a.y < b.y + 132 && a.y + 132 > b.y;
+        const overlapsX = a.x < b.x + 210 && a.x + 210 > b.x;
+        const overlapsY = a.y < b.y + 72 && a.y + 72 > b.y;
         expect(overlapsX && overlapsY).toBe(false);
       }
     }
@@ -208,20 +208,20 @@ describe("architecture orbit layout", () => {
   });
 
   it("stagger-resolves rectangular card collisions on a full orbit", () => {
-    const systems = Array.from({ length: 14 }, (_, index) => ({
+    const systems = Array.from({ length: 10 }, (_, index) => ({
       _id: `card-${index}`,
     }));
     const result = placeSystemsOnEllipseLayers(systems, {
       centerX: 650,
-      centerY: 500,
-      radiusX: 455,
-      radiusY: 330,
-      nodeWidth: 146,
-      nodeHeight: 132,
-      capacity: 14,
-      layerGapX: 175,
-      layerGapY: 125,
-      horizontalStagger: 86,
+      centerY: 430,
+      radiusX: 300,
+      radiusY: 205,
+      nodeWidth: 150,
+      nodeHeight: 72,
+      capacity: 10,
+      layerGapX: 130,
+      layerGapY: 95,
+      horizontalStagger: 36,
       collisionGap: 18,
     });
     const cards = Object.values(result.positions);
@@ -234,8 +234,8 @@ describe("architecture orbit layout", () => {
       ) {
         const a = cards[index];
         const b = cards[otherIndex];
-        const overlapsX = a.x < b.x + 164 && a.x + 164 > b.x;
-        const overlapsY = a.y < b.y + 150 && a.y + 150 > b.y;
+        const overlapsX = a.x < b.x + 168 && a.x + 168 > b.x;
+        const overlapsY = a.y < b.y + 90 && a.y + 90 > b.y;
         expect(overlapsX && overlapsY).toBe(false);
       }
     }
