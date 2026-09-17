@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   architectureNodeDensity,
+  architectureEdgePresentation,
   architectureRingForSystem,
   buildArchitectureModel,
   classifyEcosystemGroup,
+  createConcentricTopologyGeometry,
   normalizeArchitectureText,
   placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
@@ -103,7 +105,145 @@ describe("architecture ecosystem classification", () => {
   });
 });
 
+describe("architecture edge presentation", () => {
+  const distantEdge = {
+    isDistantZoom: true,
+    isHidden: false,
+    isSelected: false,
+    isEndpointFocused: false,
+    hasActiveFocus: false,
+    matchesActiveFocus: true,
+    isHighCritical: false,
+    hasHealthIssue: false,
+    isRiskEdge: false,
+    isRealtime: true,
+    baseOpacity: 0.9,
+  };
+
+  it("dims distant ordinary edges without hiding or animating them", () => {
+    expect(architectureEdgePresentation(distantEdge)).toEqual({
+      opacity: 0.06,
+      animated: false,
+      label: "none",
+    });
+  });
+
+  it("keeps a selected integration fully readable at distant zoom", () => {
+    expect(
+      architectureEdgePresentation({ ...distantEdge, isSelected: true }),
+    ).toEqual({ opacity: 1, animated: true, label: "detail" });
+  });
+
+  it("prioritizes endpoint and active criteria focus at distant zoom", () => {
+    expect(
+      architectureEdgePresentation({
+        ...distantEdge,
+        isEndpointFocused: true,
+        baseOpacity: 0.1,
+      }),
+    ).toEqual({ opacity: 0.9, animated: false, label: "detail" });
+    expect(
+      architectureEdgePresentation({
+        ...distantEdge,
+        hasActiveFocus: true,
+        baseOpacity: 0.1,
+      }),
+    ).toEqual({ opacity: 0.78, animated: true, label: "summary" });
+  });
+
+  it("surfaces attention edges but suppresses animation and overview labels", () => {
+    for (const signal of [
+      { isHighCritical: true },
+      { hasHealthIssue: true },
+      { isRiskEdge: true },
+    ]) {
+      expect(
+        architectureEdgePresentation({
+          ...distantEdge,
+          ...signal,
+          baseOpacity: 0.14,
+        }),
+      ).toEqual({ opacity: 0.48, animated: false, label: "none" });
+    }
+  });
+
+  it("preserves normal zoom presentation and disables hidden edges", () => {
+    expect(
+      architectureEdgePresentation({
+        ...distantEdge,
+        isDistantZoom: false,
+        hasActiveFocus: true,
+        baseOpacity: 0.22,
+      }),
+    ).toEqual({ opacity: 0.22, animated: true, label: "summary" });
+    expect(
+      architectureEdgePresentation({ ...distantEdge, isHidden: true }),
+    ).toEqual({ opacity: 0.9, animated: false, label: "none" });
+  });
+});
+
 describe("architecture orbit layout", () => {
+  it.each([false, true])(
+    "places systems directly on the middle and outer paths in compressed=%s geometry",
+    (isCompressed) => {
+      const geometry = createConcentricTopologyGeometry(isCompressed);
+      const [inner, middle, outer] = geometry.orbitRadii;
+
+      expect(inner).toBeGreaterThan(geometry.coreRadius);
+      expect(geometry.systemRadii.operational).toBe(middle);
+      expect(geometry.systemRadii.outer).toBe(outer);
+    },
+  );
+
+  it("matches the 1449 × 1086 reference composition", () => {
+    const geometry = createConcentricTopologyGeometry(false);
+    expect(geometry.canvas).toEqual({ width: 1449, height: 1086 });
+    expect(geometry.center).toEqual({ x: 724.5, y: 490 });
+    expect(geometry.orbitRadii).toEqual([285, 350, 430]);
+    expect(geometry.coreRadius).toBe(220);
+    expect(
+      Object.values(geometry.clusterAnchors).every(
+        ({ x, y }) =>
+          x >= 0 &&
+          x <= geometry.canvas.width &&
+          y >= 0 &&
+          y <= geometry.canvas.height,
+      ),
+    ).toBe(true);
+  });
+
+  it.each([false, true])(
+    "expands dense layers inside the orbit bounds in compressed=%s geometry",
+    (isCompressed) => {
+      const extraLayerCount = 2;
+      const layerGap = isCompressed ? 115 : 130;
+      const geometry = createConcentricTopologyGeometry(
+        isCompressed,
+        extraLayerCount,
+      );
+      const [, , outer] = geometry.orbitRadii;
+      const operationalEdge =
+        geometry.systemRadii.operational + extraLayerCount * layerGap;
+      const outerEdge = geometry.systemRadii.outer + extraLayerCount * layerGap;
+
+      expect(operationalEdge).toBeLessThanOrEqual(outer);
+      expect(outerEdge).toBeLessThanOrEqual(outer);
+
+      const anchors = Object.values(geometry.clusterAnchors);
+      expect(anchors).toHaveLength(6);
+      expect(new Set(anchors.map(({ anchor }) => anchor)).size).toBe(6);
+      expect(new Set(anchors.map(({ x, y }) => `${x},${y}`)).size).toBe(6);
+      expect(
+        anchors.every(
+          ({ x, y }) =>
+            x >= 0 &&
+            x <= geometry.canvas.width &&
+            y >= 0 &&
+            y <= geometry.canvas.height,
+        ),
+      ).toBe(true);
+    },
+  );
   it("staggers core cards left and right without overlapping", () => {
     const positions = placeCoreSystemsZigZag(
       [{ _id: "hub-1" }, { _id: "hub-2" }, { _id: "hub-3" }],

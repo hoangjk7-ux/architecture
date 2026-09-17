@@ -131,6 +131,99 @@ export function architectureNodeDensity(zoom: number, isOverview: boolean) {
   return "detailed" as const;
 }
 
+export type ArchitectureEdgeLabelMode = "none" | "summary" | "detail";
+
+export interface ArchitectureEdgePresentationInput {
+  isDistantZoom: boolean;
+  isHidden: boolean;
+  isSelected: boolean;
+  isEndpointFocused: boolean;
+  hasActiveFocus: boolean;
+  matchesActiveFocus: boolean;
+  isHighCritical: boolean;
+  hasHealthIssue: boolean;
+  isRiskEdge: boolean;
+  isRealtime: boolean;
+  baseOpacity: number;
+}
+
+/**
+ * Keeps every integration independently selectable while reducing edge noise at
+ * overview zoom. Selection always wins; attention signals only affect visual
+ * presentation and never hide or aggregate an integration.
+ */
+export function architectureEdgePresentation({
+  isDistantZoom,
+  isHidden,
+  isSelected,
+  isEndpointFocused,
+  hasActiveFocus,
+  matchesActiveFocus,
+  isHighCritical,
+  hasHealthIssue,
+  isRiskEdge,
+  isRealtime,
+  baseOpacity,
+}: ArchitectureEdgePresentationInput) {
+  if (isHidden) {
+    return { opacity: baseOpacity, animated: false, label: "none" } as const;
+  }
+
+  const isFocused = isSelected || isEndpointFocused;
+  const isAttentionEdge = isHighCritical || hasHealthIssue || isRiskEdge;
+  const isCriteriaFocused = hasActiveFocus && matchesActiveFocus;
+
+  if (!isDistantZoom) {
+    return {
+      opacity: baseOpacity,
+      animated: isRealtime,
+      label: isFocused
+        ? ("detail" as const)
+        : isCriteriaFocused
+          ? ("summary" as const)
+          : ("none" as const),
+    };
+  }
+
+  if (isSelected) {
+    return {
+      opacity: 1,
+      animated: isRealtime,
+      label: "detail",
+    } as const;
+  }
+
+  if (isEndpointFocused) {
+    return {
+      opacity: Math.max(baseOpacity, 0.9),
+      animated: false,
+      label: "detail",
+    } as const;
+  }
+
+  if (isCriteriaFocused) {
+    return {
+      opacity: Math.max(baseOpacity, 0.78),
+      animated: isRealtime,
+      label: "summary",
+    } as const;
+  }
+
+  if (isAttentionEdge) {
+    return {
+      opacity: Math.max(baseOpacity, 0.48),
+      animated: false,
+      label: "none",
+    } as const;
+  }
+
+  return {
+    opacity: Math.min(baseOpacity, 0.06),
+    animated: false,
+    label: "none",
+  } as const;
+}
+
 export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
   systems: TSystem[],
   options: {
@@ -228,6 +321,97 @@ export function placeCoreSystemsZigZag<TSystem extends { _id: string }>(
     };
   });
   return positions;
+}
+
+export type ArchitectureClusterAnchor =
+  | "top-left"
+  | "top-right"
+  | "middle-left"
+  | "middle-right"
+  | "bottom-left"
+  | "bottom-right";
+
+export interface ConcentricTopologyGeometry {
+  canvas: { width: number; height: number };
+  center: { x: number; y: number };
+  coreRadius: number;
+  orbitRadii: readonly [number, number, number];
+  systemRadii: { operational: number; outer: number };
+  clusterAnchors: Record<
+    EcosystemGroupKey,
+    { anchor: ArchitectureClusterAnchor; x: number; y: number }
+  >;
+}
+
+/**
+ * Stable geometry contract for the Architecture Map. System cards sit in the
+ * channels between orbit strokes, while the six domain summaries occupy
+ * distinct perimeter anchors. Keeping this pure makes dense/compact topology
+ * changes testable without mounting React Flow.
+ */
+export function createConcentricTopologyGeometry(
+  isCompressed: boolean,
+  extraLayerCount = 0,
+): ConcentricTopologyGeometry {
+  const canvas = isCompressed
+    ? { width: 940, height: 760 }
+    : { width: 1449, height: 1086 };
+  const center = isCompressed ? { x: 470, y: 360 } : { x: 724.5, y: 490 };
+  const normalizedExtraLayers = Math.max(0, extraLayerCount);
+  const layerExpansion = normalizedExtraLayers * (isCompressed ? 115 : 130);
+  const innerOrbitRadius = isCompressed ? 255 : 285;
+  const middleOrbitRadius = isCompressed ? 315 : 350;
+  const outerSystemRadius = isCompressed ? 400 : 430;
+  const outerOrbitRadius = outerSystemRadius + layerExpansion;
+  const orbitRadii = [
+    innerOrbitRadius,
+    middleOrbitRadius,
+    outerOrbitRadius,
+  ] as const;
+  const systemRadii = {
+    operational: middleOrbitRadius,
+    outer: outerSystemRadius,
+  };
+
+  return {
+    canvas,
+    center,
+    coreRadius: isCompressed ? 205 : 220,
+    orbitRadii,
+    systemRadii,
+    clusterAnchors: {
+      workspace: {
+        anchor: "top-left",
+        x: isCompressed ? 130 : 223,
+        y: isCompressed ? 55 : 83,
+      },
+      learning: {
+        anchor: "top-right",
+        x: isCompressed ? 810 : 1225,
+        y: isCompressed ? 55 : 83,
+      },
+      platform: {
+        anchor: "middle-left",
+        x: isCompressed ? 135 : 183,
+        y: isCompressed ? 660 : 878,
+      },
+      automation: {
+        anchor: "middle-right",
+        x: isCompressed ? 690 : 1035,
+        y: isCompressed ? 660 : 878,
+      },
+      pilot: {
+        anchor: "bottom-left",
+        x: isCompressed ? 390 : 724.5,
+        y: isCompressed ? 720 : 991,
+      },
+      legacy: {
+        anchor: "bottom-right",
+        x: isCompressed ? 815 : 1285,
+        y: isCompressed ? 660 : 878,
+      },
+    },
+  };
 }
 
 export function buildIntegrationMetrics(

@@ -51,6 +51,25 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+.architecture-system-card {
+  transform-origin: center;
+  transition:
+    transform 180ms ease,
+    filter 180ms ease,
+    box-shadow 180ms ease !important;
+}
+
+.architecture-system-card:hover {
+  transform: scale(1.02);
+  filter: brightness(1.12) saturate(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .architecture-system-card {
+    transition: none !important;
+  }
+}
+
 :root {
   --radius: 0.5rem;
   --background: oklch(0.13 0.015 260);

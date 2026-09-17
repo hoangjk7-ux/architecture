@@ -94,8 +94,10 @@ import GanttChart from "../flow-diagram/_components/GanttChart.tsx";
 import { formatVnd } from "@/lib/format.ts";
 import {
   architectureNodeDensity,
+  architectureEdgePresentation,
   buildArchitectureModel,
   classifyEcosystemGroup,
+  createConcentricTopologyGeometry,
   placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
   systemZoneFor,
@@ -394,7 +396,6 @@ const COMPACT_ZOOM_THRESHOLD = 0.35;
 const SYSTEM_NODE_WIDTH = 170;
 const CORE_NODE_WIDTH = 260;
 const SYSTEM_NODE_HEIGHT = 84;
-const REFERENCE_CANVAS = { width: 1449, height: 1086 } as const;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
   const zoom = useStore(zoomSelector);
@@ -439,6 +440,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   if (density === "mini") {
     return (
       <div
+        className="architecture-system-card"
         title={`${s.name} · ${s.category ?? ""}`}
         style={{
           background: isRiskMode
@@ -552,6 +554,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
 
   return (
     <div
+      className="architecture-system-card"
       style={{
         background: nodeBg,
         borderRadius: 10,
@@ -1792,8 +1795,16 @@ function layoutNodes(
   // The systems form the operational orbit. Small callout zones around it
   // preserve the business grouping from the reference without turning the
   // canvas back into a collection of large background rectangles.
-  const centerX = isCompressed ? 470 : REFERENCE_CANVAS.width / 2;
-  const centerY = isCompressed ? 360 : 490;
+  const preliminaryLayerCount = Math.max(
+    Math.ceil(operational.length / (isCompressed ? 10 : 8)),
+    Math.ceil(outer.length / (isCompressed ? 14 : 12)),
+    1,
+  );
+  const topology = createConcentricTopologyGeometry(
+    isCompressed,
+    preliminaryLayerCount - 1,
+  );
+  const { x: centerX, y: centerY } = topology.center;
   const coreNodeWidth = isCompressed ? 148 : CORE_NODE_WIDTH;
   const satelliteNodeWidth = isCompressed ? 128 : SYSTEM_NODE_WIDTH;
   const nodeHeight = isCompressed ? 64 : SYSTEM_NODE_HEIGHT;
@@ -1833,16 +1844,16 @@ function layoutNodes(
     Object.assign(positions, result.positions);
     return result.layers;
   };
-  const operationalLayers = placeRing(
+  placeRing(
     ringSystems.operational,
-    isCompressed ? 285 : 350,
-    isCompressed ? 210 : 300,
+    topology.systemRadii.operational,
+    topology.systemRadii.operational,
     isCompressed ? 10 : 8,
   );
-  const outerLayers = placeRing(
+  placeRing(
     ringSystems.outer,
-    isCompressed ? 400 : 430,
-    isCompressed ? 290 : 390,
+    topology.systemRadii.outer,
+    topology.systemRadii.outer,
     isCompressed ? 14 : 12,
   );
 
@@ -1853,34 +1864,13 @@ function layoutNodes(
     const key = classifyEcosystemGroup(system);
     groupCounts.set(key, (groupCounts.get(key) ?? 0) + 1);
   });
-  const denseOffset = Math.max(operationalLayers - 1, outerLayers - 1) * 125;
   const calloutPositions: Record<EcosystemGroupKey, { x: number; y: number }> =
-    {
-      workspace: {
-        x: 48 - denseOffset,
-        y: 32 - denseOffset / 2,
-      },
-      learning: {
-        x: 1049 + denseOffset,
-        y: 32 - denseOffset / 2,
-      },
-      platform: {
-        x: 48 - denseOffset,
-        y: 822 + denseOffset / 2,
-      },
-      pilot: {
-        x: centerX - (isCompressed ? calloutWidth : 338) / 2,
-        y: 935 + denseOffset,
-      },
-      automation: {
-        x: 919 + denseOffset,
-        y: 822 + denseOffset / 2,
-      },
-      legacy: {
-        x: 1169 + denseOffset,
-        y: 822 + denseOffset / 2,
-      },
-    };
+    Object.fromEntries(
+      Object.entries(topology.clusterAnchors).map(([key, point]) => [
+        key,
+        { x: point.x, y: point.y },
+      ]),
+    ) as Record<EcosystemGroupKey, { x: number; y: number }>;
   const calloutSizes: Record<
     EcosystemGroupKey,
     { width: number; height: number }
@@ -1897,10 +1887,10 @@ function layoutNodes(
       id: "zone-core",
       title: "Lõi dữ liệu & điều phối hệ thống",
       subtitle: `${centralIds.size} hub trung tâm điều phối dữ liệu, kết nối và luồng vận hành`,
-      x: centerX - 220,
-      y: centerY - 220,
-      width: 440,
-      height: 440,
+      x: centerX - topology.coreRadius,
+      y: centerY - topology.coreRadius,
+      width: topology.coreRadius * 2,
+      height: topology.coreRadius * 2,
       accent: "#8b5cf6",
     },
     ...(
@@ -1912,42 +1902,28 @@ function layoutNodes(
       id: `zone-${key}`,
       title: config.title,
       subtitle: `${groupCounts.get(key) ?? 0} hệ thống · ${config.subtitle}`,
-      x: calloutPositions[key].x,
-      y: calloutPositions[key].y,
+      x:
+        calloutPositions[key].x -
+        (isCompressed ? calloutWidth : calloutSizes[key].width) / 2,
+      y:
+        calloutPositions[key].y -
+        (isCompressed ? calloutHeight : calloutSizes[key].height) / 2,
       width: isCompressed ? calloutWidth : calloutSizes[key].width,
       height: isCompressed ? calloutHeight : calloutSizes[key].height,
       accent: config.accent,
       icon: config.icon,
     })),
   ];
-  const orbits = [
-    {
-      id: "orbit-inner",
-      x: centerX - 285,
-      y: centerY - 285,
-      width: 570,
-      height: 570,
-      accent: "#8b5cf640",
-    },
-    {
-      id: "orbit-middle",
-      x: centerX - 350,
-      y: centerY - 350,
-      width: 700,
-      height: 700,
-      accent: "#8b5cf67a",
-      dashed: true,
-      glow: true,
-    },
-    {
-      id: "orbit-outer",
-      x: centerX - 430,
-      y: centerY - 430,
-      width: 860,
-      height: 860,
-      accent: "#1997ff48",
-    },
-  ];
+  const orbits = topology.orbitRadii.map((radius, index) => ({
+    id: ["orbit-inner", "orbit-middle", "orbit-outer"][index],
+    x: centerX - radius,
+    y: centerY - radius,
+    width: radius * 2,
+    height: radius * 2,
+    accent: ["#8b5cf640", "#8b5cf67a", "#1997ff48"][index],
+    dashed: index === 1,
+    glow: index === 1,
+  }));
   const connectors = zones
     .filter((zone) => zone.id !== "zone-core")
     .map((zone) => {
@@ -3881,6 +3857,9 @@ function ArchitectureContent() {
   const [filterHealth, setFilterHealth] = useState<string>("all");
   const [edgeFocus, setEdgeFocus] = useState<EdgeFocus>("all");
   const [mapMode, setMapMode] = useState<MapMode>("ecosystem");
+  const [dataFlowMode, setDataFlowMode] = useState(false);
+  const [hoveredSystemId, setHoveredSystemId] =
+    useState<Id<"software_systems"> | null>(null);
   const [selectedZoneKey, setSelectedZoneKey] = useState<ZoneFocus>(null);
   const [hiddenZoneKeys, setHiddenZoneKeys] = useState<Set<SystemZoneKey>>(
     () => new Set(),
@@ -4038,15 +4017,17 @@ function ArchitectureContent() {
     return groups;
   }, [systems, architectureLayout.centralIds]);
 
+  const effectiveFocusId = selectedId ?? hoveredSystemId;
   const connectedNodeIds = useMemo(() => {
-    if (!selectedId) return null;
-    const ids = new Set<string>([selectedId]);
+    if (!effectiveFocusId) return null;
+    const ids = new Set<string>([effectiveFocusId]);
     integrations.forEach((i) => {
-      if (i.sourceSystemId === selectedId) ids.add(i.destinationSystemId);
-      if (i.destinationSystemId === selectedId) ids.add(i.sourceSystemId);
+      if (i.sourceSystemId === effectiveFocusId) ids.add(i.destinationSystemId);
+      if (i.destinationSystemId === effectiveFocusId) ids.add(i.sourceSystemId);
     });
+    architectureLayout.centralIds.forEach((id) => ids.add(id));
     return ids;
-  }, [selectedId, integrations]);
+  }, [effectiveFocusId, integrations, architectureLayout.centralIds]);
 
   const focusedZoneIds = useMemo(() => {
     if (!selectedZoneKey) return null;
@@ -4198,10 +4179,10 @@ function ArchitectureContent() {
           // edge anchors when semantic zoom switches content density.
           width: isCentral ? CORE_NODE_WIDTH : SYSTEM_NODE_WIDTH,
           height: SYSTEM_NODE_HEIGHT,
-          opacity: selectedId
+          opacity: effectiveFocusId
             ? connectedNodeIds!.has(s._id)
               ? 1
-              : 0.2
+              : 0.4
             : selectedZoneKey
               ? isInFocusedZone
                 ? 1
@@ -4225,6 +4206,7 @@ function ArchitectureContent() {
     integrationMetrics,
     architectureLayout,
     selectedId,
+    effectiveFocusId,
     selectedZoneKey,
     isOverviewCompressed,
     mapMode,
@@ -4311,8 +4293,8 @@ function ArchitectureContent() {
             : matchesEdgeFocus;
         const isFocused =
           selectedIntegrationId === intg._id ||
-          selectedId === intg.sourceSystemId ||
-          selectedId === intg.destinationSystemId;
+          effectiveFocusId === intg.sourceSystemId ||
+          effectiveFocusId === intg.destinationSystemId;
         const isFiltered =
           filteredIds.has(intg.sourceSystemId) &&
           filteredIds.has(intg.destinationSystemId);
@@ -4337,7 +4319,7 @@ function ArchitectureContent() {
           mapMode === "ecosystem" &&
           edgeFocus === "all";
         const edgeOpacity =
-          selectedId || selectedIntegrationId
+          effectiveFocusId || selectedIntegrationId
             ? isFocused && matchesEdgeFocus
               ? 1
               : 0.1
@@ -4354,24 +4336,41 @@ function ArchitectureContent() {
                 : mapMode === "risk"
                   ? 0.08
                   : 0.1;
+        const edgePresentation = architectureEdgePresentation({
+          isDistantZoom,
+          isHidden: isHiddenEdge,
+          isSelected: selectedIntegrationId === intg._id,
+          isEndpointFocused:
+            selectedIntegrationId !== intg._id &&
+            Boolean(
+              effectiveFocusId &&
+              (effectiveFocusId === intg.sourceSystemId ||
+                effectiveFocusId === intg.destinationSystemId),
+            ),
+          hasActiveFocus: edgeFocus !== "all" || mapMode === "risk",
+          matchesActiveFocus: matchesMapMode,
+          isHighCritical: intg.criticalLevel === "high",
+          hasHealthIssue: ["degraded", "down"].includes(intg.healthStatus),
+          isRiskEdge,
+          isRealtime: intg.method === "realtime",
+          baseOpacity: edgeOpacity,
+        });
         return {
           id: intg._id,
           source: intg.sourceSystemId,
           target: intg.destinationSystemId,
           type: "glow",
-          label: isHiddenEdge
-            ? undefined
-            : selectedIntegrationId === intg._id
-              ? `${intg.protocol} · ${
-                  METHOD_META[intg.method]?.label ?? intg.method
-                }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
-              : selectedId && isFocused
+          label:
+            edgePresentation.label === "detail"
+              ? selectedIntegrationId === intg._id ||
+                (effectiveFocusId && isFocused)
                 ? `${intg.protocol} · ${
                     METHOD_META[intg.method]?.label ?? intg.method
                   }${intg.errorRate ? ` · ${intg.errorRate}% err` : ""}`
-                : edgeFocus !== "all" || (mapMode === "risk" && isRiskEdge)
-                  ? (METHOD_META[intg.method]?.label ?? intg.method)
-                  : undefined,
+                : (METHOD_META[intg.method]?.label ?? intg.method)
+              : edgePresentation.label === "summary"
+                ? (METHOD_META[intg.method]?.label ?? intg.method)
+                : undefined,
           data: {
             isHighCritical: intg.criticalLevel === "high",
             isDetailFocused: selectedIntegrationId === intg._id,
@@ -4387,10 +4386,13 @@ function ArchitectureContent() {
                     ? 1.8
                     : 1.2,
             strokeDasharray: !intg.isArchitectureCompliant ? "6,4" : undefined,
-            opacity: edgeOpacity,
+            opacity: dataFlowMode
+              ? Math.max(edgePresentation.opacity, 0.32)
+              : edgePresentation.opacity,
           },
-          animated:
-            !isDistantZoom && !isHiddenEdge && intg.method === "realtime",
+          animated: dataFlowMode
+            ? !isHiddenEdge && matchesMapMode
+            : edgePresentation.animated,
           hidden: isHiddenEdge,
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -4403,6 +4405,7 @@ function ArchitectureContent() {
     [
       integrations,
       selectedId,
+      effectiveFocusId,
       selectedIntegrationId,
       selectedZoneKey,
       mapMode,
@@ -4413,6 +4416,7 @@ function ArchitectureContent() {
       hiddenZoneKeys,
       systemGroupMap,
       isDistantZoom,
+      dataFlowMode,
     ],
   );
 
@@ -4582,6 +4586,25 @@ function ArchitectureContent() {
     setCameraRequest({ kind: "all" });
   };
 
+  const handleResetArchitecture = () => {
+    handleClearMapCriteria();
+    setMapMode("ecosystem");
+    setDataFlowMode(false);
+    setHoveredSystemId(null);
+    setCameraRequest({ kind: "all" });
+  };
+
+  const handleFullscreen = async () => {
+    const host = canvasHostRef.current;
+    if (!host) return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await host.requestFullscreen();
+    } catch {
+      toast.error("Trình duyệt không cho phép mở chế độ toàn màn hình");
+    }
+  };
+
   if (rawSystems === undefined || rawIntegrations === undefined) {
     return (
       <div className="p-6">
@@ -4677,6 +4700,33 @@ function ArchitectureContent() {
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 cursor-pointer transition-colors"
             >
               <Maximize2 className="h-3 w-3" /> Về toàn cảnh
+            </button>
+            <button
+              onClick={() => setDataFlowMode((enabled) => !enabled)}
+              aria-pressed={dataFlowMode}
+              title="Bật/tắt chuyển động luồng dữ liệu"
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                dataFlowMode
+                  ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-200"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Share2 className="h-3 w-3" /> Data Flow
+            </button>
+            <button
+              onClick={handleResetArchitecture}
+              title="Đặt lại sơ đồ"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <RefreshCw className="h-3 w-3" /> Reset
+            </button>
+            <button
+              onClick={() => void handleFullscreen()}
+              title="Toàn màn hình"
+              aria-label="Mở sơ đồ toàn màn hình"
+              className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Maximize2 className="h-3 w-3" /> Fullscreen
             </button>
             <Popover>
               <PopoverTrigger asChild>
@@ -4880,7 +4930,7 @@ function ArchitectureContent() {
       {/* ── Architecture Map View ── */}
       {viewTab === "map" && (
         <>
-          <div className="flex flex-1 overflow-hidden">
+          <div className="relative flex flex-1 overflow-hidden">
             <div
               ref={canvasHostRef}
               className="relative flex-1 overflow-hidden"
@@ -4932,6 +4982,12 @@ function ArchitectureContent() {
                     setSelectedZoneKey(null);
                     selectSystem(node.id as Id<"software_systems">);
                   }}
+                  onNodeMouseEnter={(_event, node) => {
+                    if (!isZoneNodeId(node.id)) {
+                      setHoveredSystemId(node.id as Id<"software_systems">);
+                    }
+                  }}
+                  onNodeMouseLeave={() => setHoveredSystemId(null)}
                   onEdgeClick={(_evt, edge) =>
                     selectIntegration(edge.id as Id<"integrations">)
                   }
@@ -5413,8 +5469,10 @@ function ArchitectureContent() {
               )}
             </div>
             <div
-              className={`shrink-0 transition-all duration-300 overflow-hidden ${
-                selectedSystem || selectedIntegration ? "w-[340px]" : "w-0"
+              className={`absolute inset-y-0 right-0 z-30 shrink-0 overflow-hidden bg-background/95 shadow-2xl backdrop-blur transition-all duration-300 md:relative md:z-auto md:bg-transparent md:shadow-none ${
+                selectedSystem || selectedIntegration
+                  ? "w-[min(340px,calc(100%-1rem))] md:w-[340px]"
+                  : "w-0"
               }`}
             >
               {selectedIntegration ? (
