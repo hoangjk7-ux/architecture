@@ -252,6 +252,7 @@ const LIFECYCLE_META: Record<
 // ─── Custom Node ─────────────────────────────────────────────────────────────
 interface NodeData {
   system: System;
+  onSelect: () => void;
   inCount: number;
   outCount: number;
   worstHealth: string;
@@ -450,6 +451,19 @@ function SystemNode({ data }: NodeProps<NodeData>) {
       <div
         className="architecture-system-card"
         title={`${s.name} · ${s.category ?? ""}`}
+        role="button"
+        tabIndex={0}
+        aria-label={`Xem chi tiết ${s.name}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          data.onSelect();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            data.onSelect();
+          }
+        }}
         style={{
           background: isRiskMode
             ? "linear-gradient(180deg, #1f1119f2, #07101ef7)"
@@ -560,6 +574,56 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             </div>
           </div>
         </div>
+        <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
+          {[
+            {
+              label: "Arch",
+              value: s.architectureScore,
+              color: scoreTone(s.architectureScore),
+            },
+            {
+              label: "Debt",
+              value: s.technicalDebtScore,
+              color: scoreTone(s.technicalDebtScore, false),
+            },
+          ].map((metric) => (
+            <div key={metric.label}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 1,
+                  color: "#64748b",
+                  fontSize: 7,
+                  lineHeight: 1,
+                }}
+              >
+                <span>{metric.label}</span>
+                <span style={{ color: metric.color, fontWeight: 700 }}>
+                  {metric.value}
+                </span>
+              </div>
+              <div
+                style={{
+                  height: 2,
+                  overflow: "hidden",
+                  borderRadius: 999,
+                  background: "#1e293b",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${metric.value}%`,
+                    height: "100%",
+                    borderRadius: 999,
+                    background: metric.color,
+                    boxShadow: `0 0 5px ${metric.color}`,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -567,6 +631,19 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   return (
     <div
       className="architecture-system-card"
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem chi tiết ${s.name}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        data.onSelect();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          data.onSelect();
+        }
+      }}
       style={{
         background: nodeBg,
         borderRadius: 10,
@@ -2540,7 +2617,7 @@ function DetailPanel({
   ];
 
   return (
-    <div className="w-[340px] border-l border-border bg-background flex flex-col overflow-hidden shrink-0">
+    <div className="h-full w-full border-l border-border bg-background flex flex-col overflow-hidden shrink-0">
       <div
         className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0"
         style={{ background: meta.bg }}
@@ -3132,7 +3209,7 @@ function IntegrationInspector({
   const method = METHOD_META[integration.method] ?? METHOD_META.manual;
 
   return (
-    <aside className="flex h-full w-[340px] shrink-0 flex-col overflow-hidden border-l border-border bg-background">
+    <aside className="flex h-full w-full shrink-0 flex-col overflow-hidden border-l border-border bg-background">
       <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -4178,6 +4255,11 @@ function ArchitectureContent() {
         position: architectureLayout.positions[s._id] ?? { x: 0, y: 0 },
         data: {
           system: s,
+          onSelect: () => {
+            setSelectedZoneKey(null);
+            setSelectedIntegrationId(null);
+            setSelectedId(s._id);
+          },
           inCount: metrics.inCount,
           outCount: metrics.outCount,
           worstHealth: metrics.worstHealth,
