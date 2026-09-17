@@ -284,12 +284,14 @@ export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
     capacity: number;
     layerGapX: number;
     layerGapY: number;
+    angleOffset?: number;
     horizontalStagger?: number;
     collisionGap?: number;
   },
 ) {
   const positions: Record<string, { x: number; y: number }> = {};
   const horizontalStagger = options.horizontalStagger ?? 0;
+  const angleOffset = options.angleOffset ?? 0;
   const collisionGap = options.collisionGap ?? 0;
   const placed: Array<{ x: number; y: number }> = [];
   const layers = Math.max(1, Math.ceil(systems.length / options.capacity));
@@ -301,6 +303,7 @@ export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
     layerSystems.forEach((system, index) => {
       const angle =
         -Math.PI / 2 +
+        angleOffset +
         (index / Math.max(layerSystems.length, 1)) * Math.PI * 2 +
         (layer % 2 ? Math.PI / Math.max(layerSystems.length, 2) : 0);
       const base = {

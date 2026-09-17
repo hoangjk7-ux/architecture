@@ -411,6 +411,27 @@ describe("architecture orbit layout", () => {
     gaps.forEach((gap) => expect(gap).toBeCloseTo(Math.PI / 4, 10));
   });
 
+  it("offsets adjacent rings without changing their even spacing", () => {
+    const result = placeSystemsOnEllipseLayers(
+      Array.from({ length: 4 }, (_, index) => ({ _id: `outer-${index}` })),
+      {
+        centerX: 500,
+        centerY: 400,
+        radiusX: 300,
+        radiusY: 300,
+        nodeWidth: 100,
+        nodeHeight: 60,
+        capacity: 4,
+        layerGapX: 100,
+        layerGapY: 100,
+        angleOffset: Math.PI / 4,
+      },
+    );
+
+    expect(result.positions["outer-0"].x).toBeGreaterThan(500 - 50);
+    expect(result.positions["outer-0"].y).toBeLessThan(400 - 30);
+  });
+
   it("stagger-resolves rectangular card collisions on a full orbit", () => {
     const systems = Array.from({ length: 8 }, (_, index) => ({
       _id: `card-${index}`,
