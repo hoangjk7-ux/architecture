@@ -374,6 +374,43 @@ describe("architecture orbit layout", () => {
     expect(minimumDistance).toBeGreaterThan(70);
   });
 
+  it("redistributes satellites evenly when a new card is inserted", () => {
+    const options = {
+      centerX: 500,
+      centerY: 400,
+      radiusX: 300,
+      radiusY: 300,
+      nodeWidth: 100,
+      nodeHeight: 60,
+      capacity: 8,
+      layerGapX: 100,
+      layerGapY: 100,
+    };
+    const systems = Array.from({ length: 7 }, (_, index) => ({
+      _id: `system-${index}`,
+    }));
+    const before = placeSystemsOnEllipseLayers(systems, options).positions;
+    const after = placeSystemsOnEllipseLayers(
+      [...systems, { _id: "system-7" }],
+      options,
+    ).positions;
+    const angles = Object.values(after)
+      .map((position) =>
+        Math.atan2(
+          position.y + options.nodeHeight / 2 - options.centerY,
+          position.x + options.nodeWidth / 2 - options.centerX,
+        ),
+      )
+      .sort((a, b) => a - b);
+    const gaps = angles.map((angle, index) => {
+      const next = angles[(index + 1) % angles.length];
+      return (next - angle + Math.PI * 2) % (Math.PI * 2);
+    });
+
+    expect(before["system-1"]).not.toEqual(after["system-1"]);
+    gaps.forEach((gap) => expect(gap).toBeCloseTo(Math.PI / 4, 10));
+  });
+
   it("stagger-resolves rectangular card collisions on a full orbit", () => {
     const systems = Array.from({ length: 8 }, (_, index) => ({
       _id: `card-${index}`,

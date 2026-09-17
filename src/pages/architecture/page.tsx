@@ -101,7 +101,6 @@ import {
   integrationProtocolColor,
   placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
-  referenceOrbitSlotForSystem,
   systemZoneFor,
   toggleHiddenZone,
   type ArchitectureRing,
@@ -1843,7 +1842,6 @@ function layoutNodes(
       capacity,
       layerGapX: isCompressed ? 115 : 130,
       layerGapY: isCompressed ? 85 : 95,
-      horizontalStagger: isCompressed ? 68 : 36,
       collisionGap: isCompressed ? 10 : 18,
     });
     Object.assign(positions, result.positions);
@@ -1861,28 +1859,6 @@ function layoutNodes(
     topology.systemRadii.outer,
     isCompressed ? 14 : 12,
   );
-
-  const referenceSlots = {
-    accounting: { x: 623, y: 92 },
-    pos: { x: 333, y: 187 },
-    ecommerce: { x: 882, y: 188 },
-    dispatch: { x: 245, y: 365 },
-    sis: { x: 985, y: 365 },
-    warehouse: { x: 254, y: 520 },
-    lms: { x: 985, y: 520 },
-    fee: { x: 376, y: 694 },
-    automation: { x: 844, y: 694 },
-  } as const;
-  const occupiedReferenceSlots = new Set<string>();
-  satellites.forEach((system) => {
-    const slot = referenceOrbitSlotForSystem(system);
-    if (!slot || occupiedReferenceSlots.has(slot)) return;
-    occupiedReferenceSlots.add(slot);
-    const position = referenceSlots[slot];
-    positions[system._id] = isCompressed
-      ? { x: position.x * (940 / 1449), y: position.y * (760 / 1086) }
-      : position;
-  });
 
   const calloutWidth = isCompressed ? 240 : 260;
   const calloutHeight = isCompressed ? 74 : 102;
@@ -4971,8 +4947,50 @@ function ArchitectureContent() {
                   "radial-gradient(circle at 50% 48%, rgba(63,36,120,.22), transparent 30%), radial-gradient(circle at 78% 18%, rgba(0,117,255,.10), transparent 22%), linear-gradient(180deg,#07111f 0%,#050d19 100%)",
               }}
             >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 overflow-hidden"
+              >
+                {[
+                  { left: "7%", top: "18%", color: "#22c55e" },
+                  { left: "91%", top: "22%", color: "#38bdf8" },
+                  { left: "8%", top: "76%", color: "#8b5cf6" },
+                  { left: "90%", top: "72%", color: "#f59e0b" },
+                ].map((motif) => (
+                  <div
+                    key={`${motif.left}-${motif.top}`}
+                    className="absolute h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border"
+                    style={{
+                      left: motif.left,
+                      top: motif.top,
+                      borderColor: `${motif.color}26`,
+                      boxShadow: `0 0 44px ${motif.color}12`,
+                    }}
+                  >
+                    <div
+                      className="absolute inset-4 rounded-full border border-dashed"
+                      style={{ borderColor: `${motif.color}33` }}
+                    />
+                    <div
+                      className="absolute left-1/2 top-0 h-full w-px"
+                      style={{ background: `${motif.color}1f` }}
+                    />
+                    <div
+                      className="absolute left-0 top-1/2 h-px w-full"
+                      style={{ background: `${motif.color}1f` }}
+                    />
+                    <div
+                      className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                      style={{
+                        background: motif.color,
+                        boxShadow: `0 0 12px ${motif.color}`,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
               {systems.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
+                <div className="relative z-10 h-full flex items-center justify-center text-muted-foreground">
                   <div className="text-center space-y-2">
                     <Server className="h-12 w-12 mx-auto opacity-20" />
                     <p className="font-medium">
@@ -4982,6 +5000,7 @@ function ArchitectureContent() {
                 </div>
               ) : (
                 <ReactFlow
+                  className="relative z-10"
                   nodes={nodes}
                   edges={edges}
                   nodeTypes={nodeTypes}
