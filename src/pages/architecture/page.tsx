@@ -402,11 +402,9 @@ const SYSTEM_NODE_HEIGHT = 96;
 const CORE_NODE_HEIGHT = 84;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
-  const zoom = useStore(zoomSelector);
-  // Overview is an infographic: zoom changes scale only, never card density.
-  // Details live in the inspector after selection, so cards cannot suddenly
-  // grow and collide while the user zooms the canvas.
-  const density = data.isMini ? "mini" : architectureNodeDensity(zoom, false);
+  // System cards keep one visual hierarchy at every camera scale. Zooming
+  // transforms the complete card instead of swapping its contents.
+  const density = architectureNodeDensity(1, false);
   const isCompact = density !== "detailed";
   const {
     system: s,
@@ -472,7 +470,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           width: nodeWidth,
           height: nodeHeight,
           cursor: "pointer",
-          border: `${isSelected ? "2px" : "1.5px"} solid ${
+          border: `1.5px solid ${
             isSelected ? "#fff" : isRiskMode ? riskColor : `${groupAccent}dd`
           }`,
           boxShadow: isSelected
@@ -651,7 +649,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         height: nodeHeight,
         overflow: "hidden",
         cursor: "pointer",
-        border: `${isSelected ? "2.5px" : "1.5px"} solid ${isSelected ? "#fff" : nodeBorder}`,
+        border: `1.5px solid ${isSelected ? "#fff" : nodeBorder}`,
         boxShadow: isSelected
           ? `0 0 0 3px ${meta.border}55, 0 4px 24px #0008`
           : isRiskMode && riskTone === "high"
@@ -847,7 +845,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           </div>
         )}
         {!isCompact && (
-          <div style={{ marginBottom: 6 }}>
+          <div>
             <div
               style={{
                 display: "flex",
@@ -863,68 +861,8 @@ function SystemNode({ data }: NodeProps<NodeData>) {
               </span>
             </div>
             <ScoreBar value={s.architectureScore} color="#22c55e" />
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 8,
-                color: "#64748b",
-                marginTop: 4,
-                marginBottom: 2,
-              }}
-            >
-              <span>Tech Debt</span>
-              <span
-                style={{
-                  color:
-                    s.technicalDebtScore > 60
-                      ? "#ef4444"
-                      : s.technicalDebtScore > 30
-                        ? "#f59e0b"
-                        : "#22c55e",
-                  fontWeight: 600,
-                }}
-              >
-                {s.technicalDebtScore}
-              </span>
-            </div>
-            <ScoreBar
-              value={s.technicalDebtScore}
-              color={
-                s.technicalDebtScore > 60
-                  ? "#ef4444"
-                  : s.technicalDebtScore > 30
-                    ? "#f59e0b"
-                    : "#22c55e"
-              }
-            />
           </div>
         )}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            borderTop: "1px solid #1e293b",
-            paddingTop: 4,
-          }}
-        >
-          <span style={{ fontSize: 8, color: "#64748b" }}>← {inCount} in</span>
-          <span
-            style={{
-              fontSize: 8,
-              color: healthColor,
-              background: `${healthColor}22`,
-              borderRadius: 4,
-              padding: "1px 5px",
-              fontWeight: 600,
-            }}
-          >
-            {HEALTH_META[worstHealth]?.label ?? "?"}
-          </span>
-          <span style={{ fontSize: 8, color: "#64748b" }}>
-            {outCount} out →
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -3953,8 +3891,6 @@ function ArchitectureContent() {
   const [edgeFocus, setEdgeFocus] = useState<EdgeFocus>("all");
   const [mapMode, setMapMode] = useState<MapMode>("ecosystem");
   const [dataFlowMode, setDataFlowMode] = useState(false);
-  const [hoveredSystemId, setHoveredSystemId] =
-    useState<Id<"software_systems"> | null>(null);
   const [selectedZoneKey, setSelectedZoneKey] = useState<ZoneFocus>(null);
   const [hiddenZoneKeys, setHiddenZoneKeys] = useState<Set<SystemZoneKey>>(
     () => new Set(),
@@ -4055,8 +3991,6 @@ function ArchitectureContent() {
     setSelectedZoneKey(null);
     setSelectedIntegrationId(id);
   };
-  const isOverviewCompressed =
-    !selectedId && !selectedIntegrationId && !selectedZoneKey;
   const selectedModules = useMemo(
     () => allModules.filter((m) => m.systemId === selectedId),
     [allModules, selectedId],
@@ -4112,7 +4046,9 @@ function ArchitectureContent() {
     return groups;
   }, [systems, architectureLayout.centralIds]);
 
-  const effectiveFocusId = selectedId ?? hoveredSystemId;
+  // Hover only highlights the wires. Cards dim after an explicit selection,
+  // so merely moving the pointer never changes the overall composition.
+  const effectiveFocusId = selectedId;
   const connectedNodeIds = useMemo(() => {
     if (!effectiveFocusId) return null;
     const ids = new Set<string>([effectiveFocusId]);
@@ -4270,8 +4206,7 @@ function ArchitectureContent() {
           riskTone: riskTone.tone,
           riskColor: riskTone.color,
           riskLabel: riskTone.label,
-          // Geometry remains fixed; content density follows React Flow zoom.
-          isMini: isOverviewCompressed,
+          isMini: false,
         },
         style: {
           // Reserve the detailed card's maximum footprint even while the mini
@@ -4297,6 +4232,9 @@ function ArchitectureContent() {
                   : 1
                 : 0.2,
         },
+        draggable: false,
+        selectable: false,
+        connectable: false,
         hidden: isHiddenZone,
       };
     });
@@ -4308,7 +4246,6 @@ function ArchitectureContent() {
     selectedId,
     effectiveFocusId,
     selectedZoneKey,
-    isOverviewCompressed,
     mapMode,
     hiddenZoneKeys,
     filteredIds,
@@ -4690,7 +4627,6 @@ function ArchitectureContent() {
     handleClearMapCriteria();
     setMapMode("ecosystem");
     setDataFlowMode(false);
-    setHoveredSystemId(null);
     setCameraRequest({ kind: "all" });
   };
 
@@ -5077,17 +5013,6 @@ function ArchitectureContent() {
                   }}
                   attributionPosition="bottom-right"
                   proOptions={{ hideAttribution: true }}
-                  onNodeClick={(_evt, node) => {
-                    if (isZoneNodeId(node.id)) return;
-                    setSelectedZoneKey(null);
-                    selectSystem(node.id as Id<"software_systems">);
-                  }}
-                  onNodeMouseEnter={(_event, node) => {
-                    if (!isZoneNodeId(node.id)) {
-                      setHoveredSystemId(node.id as Id<"software_systems">);
-                    }
-                  }}
-                  onNodeMouseLeave={() => setHoveredSystemId(null)}
                   onEdgeClick={(_evt, edge) =>
                     selectIntegration(edge.id as Id<"integrations">)
                   }
