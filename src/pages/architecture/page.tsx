@@ -452,10 +452,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         role="button"
         tabIndex={0}
         aria-label={`Xem chi tiết ${s.name}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          data.onSelect();
-        }}
+        onClick={data.onSelect}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
@@ -632,10 +629,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
       role="button"
       tabIndex={0}
       aria-label={`Xem chi tiết ${s.name}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        data.onSelect();
-      }}
+      onClick={data.onSelect}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -5013,6 +5007,12 @@ function ArchitectureContent() {
                   }}
                   attributionPosition="bottom-right"
                   proOptions={{ hideAttribution: true }}
+                  onNodeClick={(_event, node) => {
+                    if (!isZoneNodeId(node.id)) {
+                      selectSystem(node.id as Id<"software_systems">);
+                      setSelectedZoneKey(null);
+                    }
+                  }}
                   onEdgeClick={(_evt, edge) =>
                     selectIntegration(edge.id as Id<"integrations">)
                   }
