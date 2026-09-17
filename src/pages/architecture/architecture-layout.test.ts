@@ -9,6 +9,7 @@ import {
   normalizeArchitectureText,
   placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
+  referenceOrbitSlotForSystem,
   systemZoneFor,
   toggleHiddenZone,
   type ArchitectureIntegration,
@@ -70,6 +71,21 @@ describe("architecture ecosystem classification", () => {
         system("vi-learning", { category: "Học thuật và tuyển sinh" }),
       ),
     ).toBe("learning");
+  });
+
+  it("maps reference systems to stable semantic orbit slots", () => {
+    expect(referenceOrbitSlotForSystem(system("x", { name: "Kế toán" }))).toBe(
+      "accounting",
+    );
+    expect(referenceOrbitSlotForSystem(system("x", { name: "Biểu phí" }))).toBe(
+      "fee",
+    );
+    expect(
+      referenceOrbitSlotForSystem(system("x", { category: "Student SIS" })),
+    ).toBe("sis");
+    expect(
+      referenceOrbitSlotForSystem(system("x", { name: "Khác" })),
+    ).toBeNull();
   });
 
   it("uses business rules instead of array position to choose a ring", () => {

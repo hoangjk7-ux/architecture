@@ -100,6 +100,7 @@ import {
   createConcentricTopologyGeometry,
   placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
+  referenceOrbitSlotForSystem,
   systemZoneFor,
   toggleHiddenZone,
   type ArchitectureRing,
@@ -393,9 +394,10 @@ function systemIconFor(system: System) {
 const zoomSelector = (state: { transform: [number, number, number] }) =>
   state.transform[2];
 const COMPACT_ZOOM_THRESHOLD = 0.35;
-const SYSTEM_NODE_WIDTH = 170;
+const SYSTEM_NODE_WIDTH = 190;
 const CORE_NODE_WIDTH = 260;
-const SYSTEM_NODE_HEIGHT = 84;
+const SYSTEM_NODE_HEIGHT = 96;
+const CORE_NODE_HEIGHT = 84;
 
 function SystemNode({ data }: NodeProps<NodeData>) {
   const zoom = useStore(zoomSelector);
@@ -425,6 +427,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   const healthColor = HEALTH_META[worstHealth]?.color ?? "#6b7280";
   const Icon = systemIconFor(s);
   const nodeWidth = isCentral ? CORE_NODE_WIDTH : SYSTEM_NODE_WIDTH;
+  const nodeHeight = isCentral ? CORE_NODE_HEIGHT : SYSTEM_NODE_HEIGHT;
   const iconSize = isCentral ? 22 : 20;
   const nodeBorder = isRiskMode ? riskColor : meta.border;
   const nodeBg = isRiskMode
@@ -448,7 +451,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             : "linear-gradient(180deg, rgba(10,25,44,.95), rgba(6,16,30,.98))",
           borderRadius: 20,
           width: nodeWidth,
-          height: SYSTEM_NODE_HEIGHT,
+          height: nodeHeight,
           cursor: "pointer",
           border: `${isSelected ? "2px" : "1.5px"} solid ${
             isSelected ? "#fff" : isRiskMode ? riskColor : `${groupAccent}dd`
@@ -559,7 +562,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         background: nodeBg,
         borderRadius: 10,
         width: nodeWidth,
-        height: SYSTEM_NODE_HEIGHT,
+        height: nodeHeight,
         overflow: "hidden",
         cursor: "pointer",
         border: `${isSelected ? "2.5px" : "1.5px"} solid ${isSelected ? "#fff" : nodeBorder}`,
@@ -910,7 +913,11 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
             textShadow: `0 0 18px ${data.accent}`,
           }}
         >
-          {data.title}
+          LÕI DỮ LIỆU &amp;
+          <br />
+          ĐIỀU PHỐI
+          <br />
+          HỆ THỐNG
         </div>
         {showMetadata && (
           <div
@@ -1019,9 +1026,10 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
               lineHeight: 1.15,
               letterSpacing: 0.3,
               textTransform: "uppercase",
-              whiteSpace: "nowrap",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              textOverflow: "ellipsis",
             }}
             title={data.title}
           >
@@ -1155,11 +1163,10 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
                 letterSpacing: 0.3,
                 textTransform: "uppercase",
                 textShadow: `0 0 12px ${data.accent}55`,
-                // See the default zone template for why this is forced to
-                // one line instead of wrapping.
-                whiteSpace: "nowrap",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
                 overflow: "hidden",
-                textOverflow: "ellipsis",
               }}
               title={data.title}
             >
@@ -1238,12 +1245,10 @@ function ZoneNode({ data }: NodeProps<ZoneNodeData>) {
             textTransform: "uppercase",
             textShadow: `0 0 14px ${data.accent}66`,
             minWidth: 0,
-            // Forced to a single line (zoneSizeFor widens narrow zones to
-            // fit realistic titles at this size) — ellipsis is only a
-            // fallback for an unexpectedly long title, not the normal case.
-            whiteSpace: "nowrap",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            textOverflow: "ellipsis",
           }}
           title={data.title}
         >
@@ -1807,7 +1812,7 @@ function layoutNodes(
   const { x: centerX, y: centerY } = topology.center;
   const coreNodeWidth = isCompressed ? 148 : CORE_NODE_WIDTH;
   const satelliteNodeWidth = isCompressed ? 128 : SYSTEM_NODE_WIDTH;
-  const nodeHeight = isCompressed ? 64 : SYSTEM_NODE_HEIGHT;
+  const satelliteNodeHeight = isCompressed ? 64 : SYSTEM_NODE_HEIGHT;
   const coreSystems = sorted.filter((system) => centralIds.has(system._id));
   Object.assign(
     positions,
@@ -1815,7 +1820,7 @@ function layoutNodes(
       centerX,
       centerY: centerY + (centralCount === 3 ? 22 : 12),
       nodeWidth: coreNodeWidth,
-      nodeHeight,
+      nodeHeight: isCompressed ? 64 : CORE_NODE_HEIGHT,
       horizontalOffset: isCompressed ? 82 : 42,
       verticalGap: isCompressed ? 76 : 104,
     }),
@@ -1834,7 +1839,7 @@ function layoutNodes(
       radiusX,
       radiusY,
       nodeWidth: satelliteNodeWidth,
-      nodeHeight,
+      nodeHeight: satelliteNodeHeight,
       capacity,
       layerGapX: isCompressed ? 115 : 130,
       layerGapY: isCompressed ? 85 : 95,
@@ -1856,6 +1861,28 @@ function layoutNodes(
     topology.systemRadii.outer,
     isCompressed ? 14 : 12,
   );
+
+  const referenceSlots = {
+    accounting: { x: 623, y: 92 },
+    pos: { x: 333, y: 187 },
+    ecommerce: { x: 882, y: 188 },
+    dispatch: { x: 245, y: 365 },
+    sis: { x: 985, y: 365 },
+    warehouse: { x: 254, y: 520 },
+    lms: { x: 985, y: 520 },
+    fee: { x: 376, y: 694 },
+    automation: { x: 844, y: 694 },
+  } as const;
+  const occupiedReferenceSlots = new Set<string>();
+  satellites.forEach((system) => {
+    const slot = referenceOrbitSlotForSystem(system);
+    if (!slot || occupiedReferenceSlots.has(slot)) return;
+    occupiedReferenceSlots.add(slot);
+    const position = referenceSlots[slot];
+    positions[system._id] = isCompressed
+      ? { x: position.x * (940 / 1449), y: position.y * (760 / 1086) }
+      : position;
+  });
 
   const calloutWidth = isCompressed ? 240 : 260;
   const calloutHeight = isCompressed ? 74 : 102;
@@ -4178,7 +4205,7 @@ function ArchitectureContent() {
           // visual is rendered. React Flow then keeps identical bounds and
           // edge anchors when semantic zoom switches content density.
           width: isCentral ? CORE_NODE_WIDTH : SYSTEM_NODE_WIDTH,
-          height: SYSTEM_NODE_HEIGHT,
+          height: isCentral ? CORE_NODE_HEIGHT : SYSTEM_NODE_HEIGHT,
           opacity: effectiveFocusId
             ? connectedNodeIds!.has(s._id)
               ? 1

@@ -53,6 +53,35 @@ export function normalizeArchitectureText(value: string) {
     .replace(/[^a-z0-9\s]/g, " ");
 }
 
+export type ReferenceOrbitSlot =
+  | "accounting"
+  | "pos"
+  | "ecommerce"
+  | "dispatch"
+  | "sis"
+  | "warehouse"
+  | "lms"
+  | "fee"
+  | "automation";
+
+/** Maps known enterprise domains to the fixed positions from the reference. */
+export function referenceOrbitSlotForSystem(system: ArchitectureSystem) {
+  const text = normalizeArchitectureText(`${system.name} ${system.category}`);
+  if (/\b(pos|point of sale)\b/.test(text)) return "pos" as const;
+  if (/ecommerce|e commerce|thuong mai dien tu/.test(text))
+    return "ecommerce" as const;
+  if (/dieu van|dispatch|logistic|transport/.test(text))
+    return "dispatch" as const;
+  if (/\b(sis|student information)\b/.test(text)) return "sis" as const;
+  if (/\b(lms|learning management)\b/.test(text)) return "lms" as const;
+  if (/bieu phi|fee engine|fee schedule/.test(text)) return "fee" as const;
+  if (/\b(kho|warehouse|inventory)\b/.test(text)) return "warehouse" as const;
+  if (/ke toan|accounting|finance/.test(text)) return "accounting" as const;
+  if (/automation|workflow|rpa|tich hop/.test(text))
+    return "automation" as const;
+  return null;
+}
+
 export function classifyEcosystemGroup(
   system: ArchitectureSystem,
 ): EcosystemGroupKey {
