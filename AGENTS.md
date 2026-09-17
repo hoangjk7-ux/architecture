@@ -4,6 +4,12 @@ Purpose
 ---
 This file gives concise, actionable guidance to AI coding agents working in this repository. Follow the "link, don't embed" principle: point agents to source files and short commands rather than duplicating long docs.
 
+Ponytail
+---
+Ponytail is installed as the Codex plugin `ponytail@ponytail` (version `4.10.0`) in the current development environment. Use the plugin's active mode; do not apply the static rules when the plugin is off. Explicit user instructions and repository-specific guidance in this file take precedence when they conflict with Ponytail.
+
+For a new environment, run `codex plugin marketplace add DietrichGebert/ponytail` and `codex plugin add ponytail@ponytail`, then review and trust the hooks through `/hooks` in Codex and start a new thread. See the [upstream installation guide](https://github.com/DietrichGebert/ponytail#install). The [static rules](docs/ponytail/rules.md) and [MIT license](docs/ponytail/LICENSE) are retained for reference from commit `e3ba2aa6f1e6f0bc4d69eb09c9f0d0a93af56156`.
+
 Quick commands
 ---
 - Development server: `pnpm run dev` (runs `vite`). See [package.json](package.json).
