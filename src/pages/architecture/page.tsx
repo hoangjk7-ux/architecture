@@ -4126,7 +4126,7 @@ function ArchitectureContent() {
         focusable: false,
         hidden: hiddenZoneKeys.has(connector.zoneKey),
         zIndex: -1,
-        style: { pointerEvents: "none" },
+        style: { pointerEvents: "none", visibility: "hidden" },
       }));
     const zoneNodes: Node<ZoneNodeData | CoreOrbitNodeData>[] =
       architectureLayout.zones.map((zone) => {
@@ -4158,6 +4158,7 @@ function ArchitectureContent() {
             width: zone.width,
             height: zone.height,
             pointerEvents: "none",
+            visibility: isCore ? "visible" : "hidden",
           },
         };
       });
