@@ -219,6 +219,9 @@ describe("architecture orbit layout", () => {
       expect(inner).toBeGreaterThan(geometry.coreRadius);
       expect(geometry.systemRadii.operational).toBe(middle);
       expect(geometry.systemRadii.outer).toBe(outer);
+      expect(
+        geometry.systemRadii.outer - geometry.systemRadii.operational,
+      ).toBe(geometry.systemRadii.operational - geometry.coreRadius);
     },
   );
 
@@ -226,7 +229,7 @@ describe("architecture orbit layout", () => {
     const geometry = createConcentricTopologyGeometry(false);
     expect(geometry.canvas).toEqual({ width: 1449, height: 1086 });
     expect(geometry.center).toEqual({ x: 724.5, y: 490 });
-    expect(geometry.orbitRadii).toEqual([285, 350, 430]);
+    expect(geometry.orbitRadii).toEqual([285, 350, 480]);
     expect(geometry.coreRadius).toBe(220);
     expect(
       Object.values(geometry.clusterAnchors).every(

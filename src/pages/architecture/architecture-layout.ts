@@ -410,9 +410,11 @@ export function createConcentricTopologyGeometry(
   const center = isCompressed ? { x: 470, y: 360 } : { x: 724.5, y: 490 };
   const normalizedExtraLayers = Math.max(0, extraLayerCount);
   const layerExpansion = normalizedExtraLayers * (isCompressed ? 115 : 130);
+  const coreRadius = isCompressed ? 205 : 220;
   const innerOrbitRadius = isCompressed ? 255 : 285;
   const middleOrbitRadius = isCompressed ? 315 : 350;
-  const outerSystemRadius = isCompressed ? 400 : 430;
+  const outerSystemRadius =
+    middleOrbitRadius + (middleOrbitRadius - coreRadius);
   const outerOrbitRadius = outerSystemRadius + layerExpansion;
   const orbitRadii = [
     innerOrbitRadius,
@@ -427,7 +429,7 @@ export function createConcentricTopologyGeometry(
   return {
     canvas,
     center,
-    coreRadius: isCompressed ? 205 : 220,
+    coreRadius,
     orbitRadii,
     systemRadii,
     clusterAnchors: {
