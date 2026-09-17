@@ -6,6 +6,7 @@ import {
   buildArchitectureModel,
   classifyEcosystemGroup,
   createConcentricTopologyGeometry,
+  integrationProtocolColor,
   normalizeArchitectureText,
   placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
@@ -195,6 +196,16 @@ describe("architecture edge presentation", () => {
     expect(
       architectureEdgePresentation({ ...distantEdge, isHidden: true }),
     ).toEqual({ opacity: 0.9, animated: false, label: "none" });
+  });
+});
+
+describe("integration protocol colors", () => {
+  it("keeps transport protocols visually distinct", () => {
+    expect(integrationProtocolColor("REST")).toBe("#38bdf8");
+    expect(integrationProtocolColor("Webhook")).toBe("#f472b6");
+    expect(integrationProtocolColor("Kafka")).toBe("#f59e0b");
+    expect(integrationProtocolColor("Direct DB")).toBe("#22c55e");
+    expect(integrationProtocolColor("unknown")).toBe("#94a3b8");
   });
 });
 

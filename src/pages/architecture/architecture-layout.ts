@@ -33,6 +33,25 @@ export interface IntegrationMetrics {
   worstHealth: string;
 }
 
+const PROTOCOL_COLORS: Record<string, string> = {
+  REST: "#38bdf8",
+  GraphQL: "#818cf8",
+  SOAP: "#60a5fa",
+  Webhook: "#f472b6",
+  Queue: "#f59e0b",
+  Kafka: "#f59e0b",
+  DB: "#22c55e",
+  ETL: "#a78bfa",
+  Other: "#94a3b8",
+};
+
+export function integrationProtocolColor(protocol: string) {
+  const normalized = protocol.trim();
+  if (/kafka|queue|message/i.test(normalized)) return PROTOCOL_COLORS.Queue;
+  if (/direct\s*db|database/i.test(normalized)) return PROTOCOL_COLORS.DB;
+  return PROTOCOL_COLORS[normalized] ?? PROTOCOL_COLORS.Other;
+}
+
 function healthPriority(health: string) {
   return health === "down"
     ? 3
@@ -422,22 +441,22 @@ export function createConcentricTopologyGeometry(
       platform: {
         anchor: "middle-left",
         x: isCompressed ? 135 : 183,
-        y: isCompressed ? 660 : 878,
+        y: isCompressed ? 625 : 835,
       },
       automation: {
         anchor: "middle-right",
         x: isCompressed ? 690 : 1035,
-        y: isCompressed ? 660 : 878,
+        y: isCompressed ? 625 : 835,
       },
       pilot: {
         anchor: "bottom-left",
         x: isCompressed ? 390 : 724.5,
-        y: isCompressed ? 720 : 991,
+        y: isCompressed ? 680 : 920,
       },
       legacy: {
         anchor: "bottom-right",
         x: isCompressed ? 815 : 1285,
-        y: isCompressed ? 660 : 878,
+        y: isCompressed ? 625 : 835,
       },
     },
   };

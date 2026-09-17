@@ -98,6 +98,7 @@ import {
   buildArchitectureModel,
   classifyEcosystemGroup,
   createConcentricTopologyGeometry,
+  integrationProtocolColor,
   placeCoreSystemsZigZag,
   placeSystemsOnEllipseLayers,
   referenceOrbitSlotForSystem,
@@ -404,7 +405,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   // Overview is an infographic: zoom changes scale only, never card density.
   // Details live in the inspector after selection, so cards cannot suddenly
   // grow and collide while the user zooms the canvas.
-  const density = architectureNodeDensity(zoom, data.isMini);
+  const density = data.isMini ? "mini" : architectureNodeDensity(zoom, false);
   const isCompact = density !== "detailed";
   const {
     system: s,
@@ -429,7 +430,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
   const nodeWidth = isCentral ? CORE_NODE_WIDTH : SYSTEM_NODE_WIDTH;
   const nodeHeight = isCentral ? CORE_NODE_HEIGHT : SYSTEM_NODE_HEIGHT;
   const iconSize = isCentral ? 22 : 20;
-  const nodeBorder = isRiskMode ? riskColor : meta.border;
+  const nodeBorder = isRiskMode ? riskColor : groupAccent;
   const nodeBg = isRiskMode
     ? riskTone === "high"
       ? "#2a1015"
@@ -438,7 +439,11 @@ function SystemNode({ data }: NodeProps<NodeData>) {
         : riskTone === "low"
           ? "#0f2318"
           : "#111827"
-    : meta.bg;
+    : `linear-gradient(180deg, ${groupAccent}1f, #06101ef7 72%)`;
+  const domainLabel =
+    data.groupKey === "core"
+      ? "Core"
+      : ECOSYSTEM_GROUPS[data.groupKey].title.split(" & ")[0];
 
   if (density === "mini") {
     return (
@@ -521,6 +526,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
                 marginTop: 3,
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "space-between",
                 gap: 4,
                 color: "#94a3b8",
                 fontSize: 8,
@@ -547,6 +553,9 @@ function SystemNode({ data }: NodeProps<NodeData>) {
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                   {isRiskMode ? riskLabel : HEALTH_META[worstHealth]?.label}
                 </span>
+              </span>
+              <span style={{ flexShrink: 0, fontFamily: "monospace" }}>
+                {inCount}/{outCount}
               </span>
             </div>
           </div>
@@ -607,7 +616,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
           // too stacks a second, unrelated color meaning on the same card
           // header (.ai/architecture-overview-ux-review.md, "Màu sắc đang
           // gánh quá nhiều nghĩa"). Neutralize it so risk color dominates.
-          background: isRiskMode ? "#1e293b" : meta.badge,
+          background: isRiskMode ? "#1e293b" : groupAccent,
           borderRadius: "8px 8px 0 0",
           padding: "3px 8px",
           display: "flex",
@@ -624,7 +633,7 @@ function SystemNode({ data }: NodeProps<NodeData>) {
             textTransform: "uppercase",
           }}
         >
-          {meta.label}
+          {domainLabel}
         </span>
         <span
           style={{
@@ -688,8 +697,8 @@ function SystemNode({ data }: NodeProps<NodeData>) {
               alignItems: "center",
               justifyContent: "center",
               color: "#fff",
-              background: `${meta.badge}44`,
-              border: `1px solid ${meta.badge}66`,
+              background: `${groupAccent}44`,
+              border: `1px solid ${groupAccent}66`,
               flexShrink: 0,
             }}
           >
@@ -866,11 +875,9 @@ function OrbitNode({ data }: NodeProps<OrbitNodeData>) {
 }
 
 function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
-  const zoom = useStore(zoomSelector);
-  const showMetadata = zoom >= COMPACT_ZOOM_THRESHOLD;
   return (
     <div
-      aria-label={data.title}
+      aria-label="Hub Middleware và CRM"
       style={{
         width: "100%",
         height: "100%",
@@ -891,48 +898,6 @@ function CoreOrbit({ data }: NodeProps<CoreOrbitNodeData>) {
           border: `1px solid ${data.accent}55`,
         }}
       />
-      <div
-        style={{
-          position: "absolute",
-          top: 20,
-          left: 42,
-          right: 42,
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            color: "#f5f3ff",
-            maxWidth: 230,
-            margin: "0 auto",
-            fontSize: 18,
-            fontWeight: 900,
-            lineHeight: 1.18,
-            letterSpacing: 0.6,
-            textTransform: "uppercase",
-            textShadow: `0 0 18px ${data.accent}`,
-          }}
-        >
-          LÕI DỮ LIỆU &amp;
-          <br />
-          ĐIỀU PHỐI
-          <br />
-          HỆ THỐNG
-        </div>
-        {showMetadata && (
-          <div
-            style={{
-              maxWidth: 270,
-              margin: "9px auto 0",
-              color: "#c4b5fd",
-              fontSize: 10,
-              lineHeight: 1.35,
-            }}
-          >
-            {data.hubCount} hub trung tâm · dữ liệu, kết nối và luồng vận hành
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -1374,6 +1339,7 @@ function GlowEdge({
   sourcePosition,
   targetPosition,
   style,
+  markerStart,
   markerEnd,
   label,
   data,
@@ -1407,7 +1373,32 @@ function GlowEdge({
           opacity={edgeOpacity * 0.12}
         />
       )}
-      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerStart={markerStart}
+        markerEnd={markerEnd}
+        style={style}
+      />
+      {data?.isDataFlow && edgeOpacity > 0.15 && (
+        <g aria-hidden="true" pointerEvents="none">
+          {["0s", "-2s"].map((begin) => (
+            <circle
+              key={begin}
+              r="3"
+              fill={strokeColor}
+              style={{ filter: `drop-shadow(0 0 5px ${strokeColor})` }}
+            >
+              <animateMotion
+                dur="4s"
+                begin={begin}
+                repeatCount="indefinite"
+                path={edgePath}
+              />
+            </circle>
+          ))}
+        </g>
+      )}
       {showLabel && (
         <EdgeLabelRenderer>
           <div
@@ -4300,7 +4291,7 @@ function ArchitectureContent() {
   const edges: Edge[] = useMemo(
     () =>
       integrations.map((intg) => {
-        const hc = HEALTH_META[intg.healthStatus] ?? HEALTH_META.unknown;
+        const protocolColor = integrationProtocolColor(intg.protocol);
         const matchesEdgeFocus =
           edgeFocus === "all" ||
           (edgeFocus === "critical" && intg.criticalLevel === "high") ||
@@ -4401,9 +4392,11 @@ function ArchitectureContent() {
           data: {
             isHighCritical: intg.criticalLevel === "high",
             isDetailFocused: selectedIntegrationId === intg._id,
+            isDataFlow: dataFlowMode && !isHiddenEdge && matchesMapMode,
+            protocol: intg.protocol,
           },
           style: {
-            stroke: hc.color,
+            stroke: protocolColor,
             strokeWidth:
               selectedIntegrationId === intg._id
                 ? 4
@@ -4417,15 +4410,13 @@ function ArchitectureContent() {
               ? Math.max(edgePresentation.opacity, 0.32)
               : edgePresentation.opacity,
           },
-          animated: dataFlowMode
-            ? !isHiddenEdge && matchesMapMode
-            : edgePresentation.animated,
+          animated: dataFlowMode ? false : edgePresentation.animated,
           hidden: isHiddenEdge,
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: hc.color,
-            width: 16,
-            height: 16,
+            color: protocolColor,
+            width: 20,
+            height: 20,
           },
         };
       }),
@@ -5089,23 +5080,28 @@ function ArchitectureContent() {
                         )}
                         <div className="mt-2 border-t border-slate-700/70 pt-2">
                           <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                            {t("arch.legend.edge")}
+                            Màu dây theo giao thức
                           </div>
                           <div className="flex flex-wrap gap-x-3 gap-y-1">
-                            {(
-                              Object.keys(
-                                HEALTH_META,
-                              ) as (keyof typeof HEALTH_META)[]
-                            ).map((hk) => (
+                            {[
+                              ["REST", "REST API"],
+                              ["Webhook", "Webhook"],
+                              ["Queue", "Queue / Kafka"],
+                              ["DB", "Direct DB"],
+                              ["ETL", "ETL"],
+                            ].map(([protocol, label]) => (
                               <span
-                                key={hk}
+                                key={protocol}
                                 className="flex items-center gap-1"
                               >
                                 <span
                                   className="inline-block w-5 h-0.5 rounded"
-                                  style={{ background: HEALTH_META[hk].color }}
+                                  style={{
+                                    background:
+                                      integrationProtocolColor(protocol),
+                                  }}
                                 />
-                                {t(`health.${hk}`)}
+                                {label}
                               </span>
                             ))}
                             <span className="flex items-center gap-1">
@@ -5412,38 +5408,6 @@ function ArchitectureContent() {
                         </div>
                       </div>
                     )}
-                  </div>
-                  <div className="absolute left-1/2 bottom-4 z-10 flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-xl border border-slate-700/80 bg-slate-950/85 px-4 py-2 text-[10px] text-slate-300 shadow-lg backdrop-blur">
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: HEALTH_META.healthy.color }}
-                      />
-                      <span className="font-semibold text-slate-100">
-                        Healthy
-                      </span>
-                      Hệ thống hoạt động tốt
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: HEALTH_META.unknown.color }}
-                      />
-                      <span className="font-semibold text-slate-100">
-                        Unknown
-                      </span>
-                      Chưa xác định trạng thái
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="rounded border border-slate-600 px-1 font-mono font-semibold text-slate-200">
-                        X/Y
-                      </span>
-                      Số kết nối vào / ra
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Database className="h-3.5 w-3.5 text-sky-300" />
-                      Số bản ghi hoặc module đang tích hợp
-                    </span>
                   </div>
                   <Background color="#1e293b" gap={28} size={1} />
                   <Controls
