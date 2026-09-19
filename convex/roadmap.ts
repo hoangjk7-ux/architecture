@@ -122,15 +122,46 @@ export const list = query({
   args: {},
   handler: async (ctx) => {
     await requireReadAccess(ctx);
-    return await ctx.db.query("roadmap_items").collect();
+    const [items, systems] = await Promise.all([
+      ctx.db.query("roadmap_items").collect(),
+      ctx.db.query("software_systems").collect(),
+    ]);
+    const systemNames = new Map(
+      systems.map((system) => [system._id, system.name]),
+    );
+    return items.map((item) =>
+      item.level === "project"
+        ? {
+            ...item,
+            title: systemNames.get(item.relatedSystemIds[0]) ?? item.title,
+          }
+        : item,
+    );
   },
 });
+
+async function normalizeProjectSystem(
+  ctx: Parameters<typeof requireWriteAccess>[0],
+  data: ReturnType<typeof normalizeRoadmapItem>,
+) {
+  if (data.level !== "project") return data;
+  if (data.relatedSystemIds.length !== 1)
+    domainError(
+      "VALIDATION_ERROR",
+      "Project must reference exactly one system from Kho hệ thống",
+      "relatedSystemIds",
+    );
+  const system = await ctx.db.get(data.relatedSystemIds[0]);
+  if (!system)
+    domainError("NOT_FOUND", "Software system not found", "relatedSystemIds");
+  return { ...data, title: system.name };
+}
 
 export const create = mutation({
   args: roadmapArgs,
   handler: async (ctx, args) => {
     await requireWriteAccess(ctx);
-    const data = normalizeRoadmapItem(args);
+    const data = await normalizeProjectSystem(ctx, normalizeRoadmapItem(args));
     await validateRelatedSystems(ctx, data.relatedSystemIds);
     await validateParent(ctx, data.level, data.parentId);
     return await ctx.db.insert("roadmap_items", data);
@@ -144,7 +175,10 @@ export const update = mutation({
     const { id, ...data } = args;
     if (!(await ctx.db.get(id)))
       domainError("NOT_FOUND", "Roadmap item not found", "id");
-    const normalized = normalizeRoadmapItem(data);
+    const normalized = await normalizeProjectSystem(
+      ctx,
+      normalizeRoadmapItem(data),
+    );
     await validateRelatedSystems(ctx, normalized.relatedSystemIds);
     await validateParent(ctx, normalized.level, normalized.parentId, id);
     const children = await ctx.db

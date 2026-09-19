@@ -30,6 +30,10 @@ const roadmapInput = (
 describe("DATA-03 roadmap invariants", () => {
   it("enforces hierarchy, detects cycles and cascades descendant deletion", async () => {
     const t = await createAuthorizedConvexTest();
+    const systemId = await t.mutation(
+      api.software_systems.create,
+      systemInput("Project System"),
+    );
     const initiativeId = await t.mutation(
       api.roadmap.create,
       roadmapInput("Initiative", "initiative"),
@@ -41,6 +45,7 @@ describe("DATA-03 roadmap invariants", () => {
     const projectId = await t.mutation(api.roadmap.create, {
       ...roadmapInput("Project", "project"),
       parentId: programId,
+      relatedSystemIds: [systemId],
     });
 
     await expect(

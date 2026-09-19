@@ -44,6 +44,18 @@ const sampleSprints = [
 async function createProjectChain(
   t: Awaited<ReturnType<typeof createAuthorizedConvexTest>>,
 ) {
+  const systemId = await t.mutation(api.software_systems.create, {
+    name: "PM Bán Hàng & Kho",
+    type: "core",
+    category: "ERP",
+    status: "active",
+    criticality: "high",
+    departments: [],
+    campuses: [],
+    riskLevel: "low",
+    technicalDebtScore: 0,
+    architectureScore: 80,
+  });
   const initiativeId = await t.mutation(
     api.roadmap.create,
     roadmapInput("VA", "initiative"),
@@ -55,6 +67,7 @@ async function createProjectChain(
   return await t.mutation(api.roadmap.create, {
     ...roadmapInput("PM Bán Hàng & Kho", "project"),
     parentId: programId,
+    relatedSystemIds: [systemId],
   });
 }
 

@@ -17,6 +17,20 @@ const item = (
 describe("project cost access and roll-up", () => {
   it("rolls Task and Non-Labor costs up by Project ID", async () => {
     const t = await createAuthorizedConvexTest("cto");
+    const systemId = await t.run(async (ctx) =>
+      ctx.db.insert("software_systems", {
+        name: "Project System",
+        type: "core",
+        category: "ERP",
+        status: "active",
+        criticality: "high",
+        departments: [],
+        campuses: [],
+        riskLevel: "low",
+        technicalDebtScore: 0,
+        architectureScore: 80,
+      }),
+    );
     const initiativeId = await t.mutation(
       api.roadmap.create,
       item("I", "initiative"),
@@ -28,6 +42,7 @@ describe("project cost access and roll-up", () => {
     const projectId = await t.mutation(api.roadmap.create, {
       ...item("Project", "project"),
       parentId: programId,
+      relatedSystemIds: [systemId],
     });
     const sprintId = await t.mutation(api.roadmap.create, {
       ...item("Sprint", "sprint"),

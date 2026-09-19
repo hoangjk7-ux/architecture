@@ -34,6 +34,7 @@ type Tab = "projects" | "resources" | "tco";
 
 export default function CostsPage() {
   const items = useQuery(api.roadmap.list) ?? [];
+  const systems = useQuery(api.software_systems.list) ?? [];
   const summaries = useQuery(api.roadmap.listProjectCostSummaries) ?? [];
   const master = useQuery(api.roadmap.listProjectCostMasterData);
   const createRate = useMutation(api.roadmap.createProjectRoleRate);
@@ -62,6 +63,11 @@ export default function CostsPage() {
   );
   const [amount, setAmount] = useState("");
   const projects = items.filter((item) => item.level === "project");
+  const systemNames = new Map(
+    systems.map((system) => [system._id, system.name]),
+  );
+  const projectName = (project: (typeof projects)[number]) =>
+    systemNames.get(project.relatedSystemIds[0]) ?? project.title;
   const sprints = items.filter(
     (item) => item.level === "sprint" && item.parentId === projectId,
   );
@@ -172,7 +178,9 @@ export default function CostsPage() {
                 const summary = summaryByProject.get(project._id);
                 return (
                   <tr key={project._id} className="hover:bg-muted/20">
-                    <td className="px-4 py-3 font-medium">{project.title}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {projectName(project)}
+                    </td>
                     <td className="px-4 py-3">{project.owner || "—"}</td>
                     <td className="px-4 py-3">
                       <Badge variant="secondary">
@@ -302,7 +310,7 @@ export default function CostsPage() {
                 <SelectContent>
                   {projects.map((p) => (
                     <SelectItem key={p._id} value={p._id}>
-                      {p.title}
+                      {projectName(p)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -417,7 +425,7 @@ export default function CostsPage() {
                       onClick={() => setOtherProjectId(project._id)}
                     >
                       <td className="cursor-pointer px-4 py-3 font-medium">
-                        {project.title}
+                        {projectName(project)}
                       </td>
                       <td className="px-4 py-3">
                         {formatVnd(summary?.forecastCost ?? 0)}
@@ -456,7 +464,7 @@ export default function CostsPage() {
                 <SelectContent>
                   {projects.map((p) => (
                     <SelectItem key={p._id} value={p._id}>
-                      {p.title}
+                      {projectName(p)}
                     </SelectItem>
                   ))}
                 </SelectContent>

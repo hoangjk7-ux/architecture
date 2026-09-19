@@ -154,6 +154,16 @@ describe("DATA-02 mutation validation", () => {
       }),
     ).rejects.toMatchObject({ data: { code: "VALIDATION_ERROR" } });
 
+    await expect(
+      t.mutation(api.roadmap.create, {
+        ...roadmapInput,
+        level: "project",
+        startDate: undefined,
+        dueDate: undefined,
+        relatedSystemIds: [],
+      }),
+    ).rejects.toMatchObject({ data: { code: "VALIDATION_ERROR" } });
+
     await t.run(async (ctx) => ctx.db.delete(systemId));
     await expect(
       t.mutation(api.roadmap.create, {
