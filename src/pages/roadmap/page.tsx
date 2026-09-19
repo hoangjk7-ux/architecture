@@ -58,11 +58,10 @@ type ProjectCostSummary = {
 };
 
 const costCategories = {
-  server: "Server",
-  domain: "Domain",
-  license: "License",
-  software: "Software",
-  outsource: "Outsource",
+  server_domain: "Server / Domain",
+  cloud_infrastructure: "Cloud / Infrastructure",
+  software_license: "Software / License",
+  outsource_vendor: "Outsource / Vendor",
   other: "Other",
 } as const;
 
@@ -401,7 +400,7 @@ function ProjectCostDialog({
   const createCost = useMutation(api.roadmap.createProjectNonLaborCost);
   const removeCost = useMutation(api.roadmap.removeProjectNonLaborCost);
   const [category, setCategory] =
-    useState<keyof typeof costCategories>("server");
+    useState<keyof typeof costCategories>("server_domain");
   const [costType, setCostType] = useState<"initial" | "monthly" | "annual">(
     "initial",
   );

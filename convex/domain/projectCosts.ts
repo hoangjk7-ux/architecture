@@ -34,8 +34,8 @@ export function calculateProjectCost(
     budgetCost += cost.budgetCost;
     actualCost += cost.actualCost;
     remainingCost += cost.remainingCost;
-    if (task.phase === "pre_uat") internalPreUat += cost.forecastCost;
-    else internalPostUat += cost.forecastCost;
+    if (task.phase === "pre_uat") internalPreUat += cost.actualCost;
+    else internalPostUat += cost.actualCost;
   }
   const initialCost = nonLaborCosts
     .filter((cost) => cost.costType === "initial")
@@ -46,15 +46,17 @@ export function calculateProjectCost(
   const annualCost = nonLaborCosts
     .filter((cost) => cost.costType === "annual")
     .reduce((sum, cost) => sum + cost.amount, 0);
-  const internalResourceCost = internalPreUat + internalPostUat;
+  const forecastCost = actualCost + remainingCost;
+  const projectRemainingCost = Math.max(budgetCost - actualCost, 0);
+  const internalResourceCost = actualCost;
   const usedPercent = budgetCost
     ? Math.round((actualCost / budgetCost) * 10000) / 100
     : 0;
   return {
     budgetCost,
     actualCost,
-    remainingCost,
-    forecastCost: actualCost + remainingCost,
+    remainingCost: projectRemainingCost,
+    forecastCost,
     usedPercent,
     internalPreUat,
     internalPostUat,
@@ -62,8 +64,7 @@ export function calculateProjectCost(
     initialCost,
     monthlyCost,
     annualCost,
-    year1Cost:
-      internalResourceCost + initialCost + monthlyCost * 12 + annualCost,
-    year2AnnualRunRate: monthlyCost * 12,
+    year1Cost: forecastCost + initialCost + monthlyCost * 12 + annualCost,
+    year2AnnualRunRate: monthlyCost * 12 + annualCost,
   };
 }

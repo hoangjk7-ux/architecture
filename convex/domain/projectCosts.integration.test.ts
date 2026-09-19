@@ -53,7 +53,7 @@ describe("project cost access and roll-up", () => {
     });
     await t.mutation(api.roadmap.createProjectNonLaborCost, {
       projectId,
-      category: "server",
+      category: "server_domain",
       costType: "monthly",
       amount: 50,
     });
@@ -62,7 +62,9 @@ describe("project cost access and roll-up", () => {
     expect(summaries).toContainEqual(
       expect.objectContaining({
         projectId,
-        internalResourceCost: 1000,
+        internalResourceCost: 500,
+        remainingCost: 500,
+        forecastCost: 1000,
         year1Cost: 1600,
         year2AnnualRunRate: 600,
       }),

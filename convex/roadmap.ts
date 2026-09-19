@@ -448,11 +448,10 @@ export const createProjectNonLaborCost = mutation({
   args: {
     projectId: v.id("roadmap_items"),
     category: v.union(
-      v.literal("server"),
-      v.literal("domain"),
-      v.literal("license"),
-      v.literal("software"),
-      v.literal("outsource"),
+      v.literal("server_domain"),
+      v.literal("cloud_infrastructure"),
+      v.literal("software_license"),
+      v.literal("outsource_vendor"),
       v.literal("other"),
     ),
     costType: v.union(

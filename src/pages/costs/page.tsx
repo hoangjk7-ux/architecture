@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { CircleDollarSign, Trash2, UsersRound } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { formatVnd } from "@/lib/format.ts";
+import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
@@ -12,18 +14,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
-import { CircleDollarSign, Trash2, UsersRound } from "lucide-react";
-import { toast } from "sonner";
+import { formatVnd } from "@/lib/format.ts";
 
 const categories = {
-  server: "Server",
-  domain: "Domain",
-  license: "License",
-  software: "Software",
-  outsource: "Outsource",
+  server_domain: "Server / Domain",
+  cloud_infrastructure: "Cloud / Infrastructure",
+  software_license: "Software / License",
+  outsource_vendor: "Outsource / Vendor",
   other: "Other",
 } as const;
+const statuses: Record<string, string> = {
+  not_started: "Chưa bắt đầu",
+  in_progress: "Đang thực hiện",
+  blocked: "Bị chặn",
+  done: "Hoàn thành",
+  cancelled: "Đã hủy",
+};
+type Tab = "projects" | "resources" | "tco";
 
 export default function CostsPage() {
   const items = useQuery(api.roadmap.list) ?? [];
@@ -34,7 +41,7 @@ export default function CostsPage() {
   const createTask = useMutation(api.roadmap.createProjectTask);
   const createOther = useMutation(api.roadmap.createProjectNonLaborCost);
   const removeOther = useMutation(api.roadmap.removeProjectNonLaborCost);
-  const [tab, setTab] = useState<"resources" | "projects">("resources");
+  const [tab, setTab] = useState<Tab>("projects");
   const [rateName, setRateName] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [resourceName, setResourceName] = useState("");
@@ -48,7 +55,8 @@ export default function CostsPage() {
   const [actual, setActual] = useState("");
   const [remaining, setRemaining] = useState("");
   const [otherProjectId, setOtherProjectId] = useState("");
-  const [category, setCategory] = useState<keyof typeof categories>("server");
+  const [category, setCategory] =
+    useState<keyof typeof categories>("server_domain");
   const [costType, setCostType] = useState<"initial" | "monthly" | "annual">(
     "initial",
   );
@@ -57,7 +65,9 @@ export default function CostsPage() {
   const sprints = items.filter(
     (item) => item.level === "sprint" && item.parentId === projectId,
   );
-  const tasks = summaries.flatMap((summary) => summary.tasks);
+  const summaryByProject = new Map(
+    summaries.map((summary) => [summary.projectId, summary]),
+  );
 
   const saveRate = async () => {
     await createRate({ name: rateName, hourlyRate: Number(hourlyRate) });
@@ -109,10 +119,16 @@ export default function CostsPage() {
           Quản lý chi phí
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Nguồn lực nội bộ và tổng chi phí dự án theo Project ID
+          Tách biệt hiệu quả nguồn lực và tổng chi phí sở hữu theo Project ID
         </p>
       </div>
-      <div className="flex gap-2 border-b pb-3">
+      <div className="flex flex-wrap gap-2 border-b pb-3">
+        <Button
+          variant={tab === "projects" ? "default" : "outline"}
+          onClick={() => setTab("projects")}
+        >
+          Dự án
+        </Button>
         <Button
           variant={tab === "resources" ? "default" : "outline"}
           onClick={() => setTab("resources")}
@@ -121,82 +137,157 @@ export default function CostsPage() {
           Nguồn lực nội bộ
         </Button>
         <Button
-          variant={tab === "projects" ? "default" : "outline"}
-          onClick={() => setTab("projects")}
+          variant={tab === "tco" ? "default" : "outline"}
+          onClick={() => setTab("tco")}
         >
           <CircleDollarSign className="mr-2 h-4 w-4" />
           Chi phí dự án
         </Button>
       </div>
 
-      {tab === "resources" ? (
+      {tab === "projects" && (
+        <section className="overflow-x-auto rounded-xl border bg-card">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+              <tr>
+                {[
+                  "Dự án",
+                  "PM",
+                  "Trạng thái",
+                  "Budget",
+                  "Forecast",
+                  "Actual",
+                  "Remaining",
+                  "Used",
+                  "Thao tác",
+                ].map((label) => (
+                  <th key={label} className="px-4 py-3 font-medium">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {projects.map((project) => {
+                const summary = summaryByProject.get(project._id);
+                return (
+                  <tr key={project._id} className="hover:bg-muted/20">
+                    <td className="px-4 py-3 font-medium">{project.title}</td>
+                    <td className="px-4 py-3">{project.owner || "—"}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="secondary">
+                        {statuses[project.status] ?? project.status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatVnd(summary?.budgetCost ?? 0)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatVnd(summary?.forecastCost ?? 0)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatVnd(summary?.actualCost ?? 0)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatVnd(summary?.remainingCost ?? 0)}
+                    </td>
+                    <td className="px-4 py-3 font-medium">
+                      {summary?.usedPercent ?? 0}%
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOtherProjectId(project._id);
+                          setTab("tco");
+                        }}
+                      >
+                        Chi tiết
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {tab === "resources" && (
         <div className="space-y-5">
+          <div className="grid gap-5 xl:grid-cols-2">
+            <section className="rounded-xl border bg-card p-4">
+              <h2 className="mb-3 font-semibold">Role & đơn giá theo giờ</h2>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(master?.roleRates ?? []).map((rate) => (
+                  <Badge key={rate._id}>
+                    {rate.name}: {formatVnd(rate.hourlyRate)}/giờ
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={rateName}
+                  onChange={(e) => setRateName(e.target.value)}
+                  placeholder="Role: Dev, BA, PM"
+                />
+                <Input
+                  type="number"
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(e.target.value)}
+                  placeholder="Đơn giá/giờ"
+                />
+                <Button
+                  disabled={!rateName || !hourlyRate}
+                  onClick={() => void saveRate()}
+                >
+                  Thêm
+                </Button>
+              </div>
+            </section>
+            <section className="rounded-xl border bg-card p-4">
+              <h2 className="mb-3 font-semibold">Resource Master</h2>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(master?.resources ?? []).map((resource) => (
+                  <Badge variant="secondary" key={resource._id}>
+                    {resource.name}
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={resourceName}
+                  onChange={(e) => setResourceName(e.target.value)}
+                  placeholder="Tên nhân sự"
+                />
+                <Select value={roleRateId} onValueChange={setRoleRateId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(master?.roleRates ?? []).map((rate) => (
+                      <SelectItem key={rate._id} value={rate._id}>
+                        {rate.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  disabled={!resourceName || !roleRateId}
+                  onClick={() => void saveResource()}
+                >
+                  Thêm
+                </Button>
+              </div>
+            </section>
+          </div>
           <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 font-semibold">Role & đơn giá theo giờ</h2>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {(master?.roleRates ?? []).map((rate) => (
-                <Badge key={rate._id}>
-                  {rate.name}: {formatVnd(rate.hourlyRate)}/giờ
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={rateName}
-                onChange={(e) => setRateName(e.target.value)}
-                placeholder="Role: Dev, BA, PM"
-              />
-              <Input
-                type="number"
-                value={hourlyRate}
-                onChange={(e) => setHourlyRate(e.target.value)}
-                placeholder="Đơn giá/giờ"
-              />
-              <Button
-                disabled={!rateName || !hourlyRate}
-                onClick={() => void saveRate()}
-              >
-                Thêm
-              </Button>
-            </div>
-          </section>
-          <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 font-semibold">Resource Master</h2>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {(master?.resources ?? []).map((resource) => (
-                <Badge variant="secondary" key={resource._id}>
-                  {resource.name}
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={resourceName}
-                onChange={(e) => setResourceName(e.target.value)}
-                placeholder="Tên nhân sự"
-              />
-              <Select value={roleRateId} onValueChange={setRoleRateId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(master?.roleRates ?? []).map((rate) => (
-                    <SelectItem key={rate._id} value={rate._id}>
-                      {rate.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                disabled={!resourceName || !roleRateId}
-                onClick={() => void saveResource()}
-              >
-                Thêm
-              </Button>
-            </div>
-          </section>
-          <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 font-semibold">Task Cost</h2>
+            <h2 className="mb-1 font-semibold">Task Cost</h2>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Actual được tách Pre-UAT/Post-UAT; chi phí tự tính từ Assignee →
+              Role → Unit Rate → Hours.
+            </p>
             <div className="grid gap-2 md:grid-cols-4">
               <Select
                 value={projectId}
@@ -284,74 +375,79 @@ export default function CostsPage() {
               Thêm Task
             </Button>
             <div className="mt-4 text-xs text-muted-foreground">
-              {tasks.length} Task đang được roll-up vào chi phí Project.
+              {summaries.flatMap((summary) => summary.tasks).length} Task đang
+              được roll-up vào chi phí Project.
             </div>
           </section>
         </div>
-      ) : (
+      )}
+
+      {tab === "tco" && (
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => {
-              const s = summaries.find((x) => x.projectId === project._id);
-              return (
-                <div
-                  key={project._id}
-                  className="rounded-xl border bg-card p-4"
-                >
-                  <h3 className="font-semibold">{project.title}</h3>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                    <span>
-                      Budget
-                      <br />
-                      <strong>{formatVnd(s?.budgetCost ?? 0)}</strong>
-                    </span>
-                    <span>
-                      Forecast
-                      <br />
-                      <strong>{formatVnd(s?.forecastCost ?? 0)}</strong>
-                    </span>
-                    <span>
-                      Actual
-                      <br />
-                      <strong>{formatVnd(s?.actualCost ?? 0)}</strong>
-                    </span>
-                    <span>
-                      Remaining
-                      <br />
-                      <strong>{formatVnd(s?.remainingCost ?? 0)}</strong>
-                    </span>
-                    <span>
-                      Used
-                      <br />
-                      <strong>{s?.usedPercent ?? 0}%</strong>
-                    </span>
-                    <span>
-                      Năm 1<br />
-                      <strong>{formatVnd(s?.year1Cost ?? 0)}</strong>
-                    </span>
-                  </div>
-                  {s?.nonLaborCosts.map((cost) => (
-                    <div
-                      key={cost._id}
-                      className="mt-2 flex items-center gap-2 text-xs"
-                    >
-                      <span className="flex-1">
-                        {categories[cost.category]} · {cost.costType}
-                      </span>
-                      <strong>{formatVnd(cost.amount)}</strong>
-                      <button
-                        onClick={() => void removeOther({ id: cost._id })}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </button>
-                    </div>
+          <section className="overflow-x-auto rounded-xl border bg-card">
+            <table className="w-full min-w-[960px] text-sm">
+              <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+                <tr>
+                  {[
+                    "Dự án",
+                    "Nguồn lực nội bộ",
+                    "Đầu tư ban đầu",
+                    "Duy trì/tháng",
+                    "Gia hạn/năm",
+                    "Tổng Năm 1",
+                    "Từ Năm 2/năm",
+                  ].map((label) => (
+                    <th key={label} className="px-4 py-3 font-medium">
+                      {label}
+                    </th>
                   ))}
-                </div>
-              );
-            })}
-          </div>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {projects.map((project) => {
+                  const summary = summaryByProject.get(project._id);
+                  return (
+                    <tr
+                      key={project._id}
+                      className={
+                        otherProjectId === project._id
+                          ? "bg-primary/5"
+                          : "hover:bg-muted/20"
+                      }
+                      onClick={() => setOtherProjectId(project._id)}
+                    >
+                      <td className="cursor-pointer px-4 py-3 font-medium">
+                        {project.title}
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatVnd(summary?.forecastCost ?? 0)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatVnd(summary?.initialCost ?? 0)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatVnd(summary?.monthlyCost ?? 0)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatVnd(summary?.annualCost ?? 0)}
+                      </td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatVnd(summary?.year1Cost ?? 0)}
+                      </td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatVnd(summary?.year2AnnualRunRate ?? 0)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
           <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-3 font-semibold">Thêm chi phí dự án</h2>
+            <h2 className="font-semibold">Chi phí ngoài nguồn lực</h2>
+            <p className="mb-3 mt-1 text-xs text-muted-foreground">
+              Nguồn lực nội bộ được kế thừa từ Forecast, không nhập lại tại đây.
+            </p>
             <div className="grid gap-2 md:grid-cols-5">
               <Select value={otherProjectId} onValueChange={setOtherProjectId}>
                 <SelectTrigger>
@@ -373,9 +469,9 @@ export default function CostsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(categories).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>
-                      {l}
+                  {Object.entries(categories).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -388,13 +484,14 @@ export default function CostsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="initial">Initial</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
+                  <SelectItem value="initial">Đầu tư ban đầu</SelectItem>
+                  <SelectItem value="monthly">Duy trì/tháng</SelectItem>
+                  <SelectItem value="annual">Gia hạn/năm</SelectItem>
                 </SelectContent>
               </Select>
               <Input
                 type="number"
+                min={0}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Số tiền"
@@ -406,6 +503,27 @@ export default function CostsPage() {
                 Thêm
               </Button>
             </div>
+            {summaryByProject
+              .get(otherProjectId as Id<"roadmap_items">)
+              ?.nonLaborCosts.map((cost) => (
+                <div
+                  key={cost._id}
+                  className="mt-3 flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+                >
+                  <span className="flex-1">
+                    {categories[cost.category]} · {cost.costType}
+                  </span>
+                  <strong>{formatVnd(cost.amount)}</strong>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive"
+                    onClick={() => void removeOther({ id: cost._id })}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
           </section>
         </div>
       )}

@@ -44,9 +44,14 @@ describe("project cost roll-up", () => {
       ],
     );
 
-    expect(result.internalPreUat).toBe(1000);
-    expect(result.internalPostUat).toBe(1000);
+    expect(result.internalPreUat).toBe(500);
+    expect(result.internalPostUat).toBe(400);
+    expect(result.budgetCost).toBe(1800);
+    expect(result.actualCost).toBe(900);
+    expect(result.remainingCost).toBe(900);
+    expect(result.forecastCost).toBe(2000);
+    expect(result.usedPercent).toBe(50);
     expect(result.year1Cost).toBe(4500);
-    expect(result.year2AnnualRunRate).toBe(1200);
+    expect(result.year2AnnualRunRate).toBe(1500);
   });
 });
