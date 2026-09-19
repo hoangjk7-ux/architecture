@@ -287,13 +287,15 @@ export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
     angleOffset?: number;
     horizontalStagger?: number;
     collisionGap?: number;
+    avoidPositions?: Array<{ x: number; y: number }>;
+    radialCollisionStep?: number;
   },
 ) {
   const positions: Record<string, { x: number; y: number }> = {};
   const horizontalStagger = options.horizontalStagger ?? 0;
   const angleOffset = options.angleOffset ?? 0;
   const collisionGap = options.collisionGap ?? 0;
-  const placed: Array<{ x: number; y: number }> = [];
+  const placed = [...(options.avoidPositions ?? [])];
   const layers = Math.max(1, Math.ceil(systems.length / options.capacity));
   for (let layer = 0; layer < layers; layer += 1) {
     const layerSystems = systems.slice(
@@ -329,12 +331,19 @@ export function placeSystemsOnEllipseLayers<TSystem extends { _id: string }>(
         );
       while (overlapsPlacedCard() && attempt < 20) {
         attempt += 1;
-        const direction = (index + attempt) % 2 === 0 ? -1 : 1;
-        position.x =
-          base.x +
-          direction *
-            Math.ceil(attempt / 2) *
-            (options.nodeWidth + collisionGap);
+        if (options.radialCollisionStep) {
+          position.x =
+            base.x + Math.cos(angle) * attempt * options.radialCollisionStep;
+          position.y =
+            base.y + Math.sin(angle) * attempt * options.radialCollisionStep;
+        } else {
+          const direction = (index + attempt) % 2 === 0 ? -1 : 1;
+          position.x =
+            base.x +
+            direction *
+              Math.ceil(attempt / 2) *
+              (options.nodeWidth + collisionGap);
+        }
       }
       positions[system._id] = position;
       placed.push(position);

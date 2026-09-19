@@ -435,6 +435,26 @@ describe("architecture orbit layout", () => {
     expect(result.positions["outer-0"].y).toBeLessThan(400 - 30);
   });
 
+  it("pushes an outer card radially until its rectangle clears an inner card", () => {
+    const blocker = { x: 450, y: 70 };
+    const result = placeSystemsOnEllipseLayers([{ _id: "pilot" }], {
+      centerX: 500,
+      centerY: 400,
+      radiusX: 300,
+      radiusY: 300,
+      nodeWidth: 100,
+      nodeHeight: 60,
+      capacity: 4,
+      layerGapX: 100,
+      layerGapY: 100,
+      collisionGap: 10,
+      avoidPositions: [blocker],
+      radialCollisionStep: 30,
+    });
+
+    expect(result.positions.pilot.y + 60 + 10).toBeLessThanOrEqual(blocker.y);
+  });
+
   it("stagger-resolves rectangular card collisions on a full orbit", () => {
     const systems = Array.from({ length: 8 }, (_, index) => ({
       _id: `card-${index}`,

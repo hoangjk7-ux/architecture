@@ -1832,6 +1832,7 @@ function layoutNodes(
     radiusY: number,
     capacity: number,
     angleOffset = 0,
+    avoidPositions: Array<{ x: number; y: number }> = [],
   ) => {
     const result = placeSystemsOnEllipseLayers(items, {
       centerX,
@@ -1845,11 +1846,13 @@ function layoutNodes(
       layerGapX: isCompressed ? 115 : 130,
       layerGapY: isCompressed ? 85 : 95,
       collisionGap: isCompressed ? 10 : 18,
+      avoidPositions,
+      radialCollisionStep: avoidPositions.length ? 24 : undefined,
     });
     Object.assign(positions, result.positions);
-    return result.layers;
+    return result.positions;
   };
-  placeRing(
+  const operationalPositions = placeRing(
     ringSystems.operational,
     topology.systemRadii.operational,
     topology.systemRadii.operational,
@@ -1861,6 +1864,7 @@ function layoutNodes(
     topology.systemRadii.outer,
     isCompressed ? 14 : 12,
     Math.PI / Math.max(Math.min(ringSystems.outer.length, 12), 2),
+    Object.values(operationalPositions),
   );
 
   const calloutWidth = isCompressed ? 240 : 260;
