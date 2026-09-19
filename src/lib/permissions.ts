@@ -25,6 +25,13 @@ const allRoles: readonly UserRole[] = [
   "finance_manager",
 ];
 
+export const projectCostRoles: readonly UserRole[] = [
+  "cto",
+  "it_manager",
+  "resource_manager",
+  "finance_manager",
+];
+
 export const routeRoles = {
   dashboard: allRoles,
   systems: ["cto", "it_manager", "business_owner", "viewer"],
@@ -32,14 +39,8 @@ export const routeRoles = {
   architecture: ["cto", "it_manager", "business_owner", "viewer"],
   integrations: ["cto", "it_manager", "viewer"],
   roadmap: allRoles,
+  costs: projectCostRoles,
   demands: allRoles,
   users: ["cto"],
   settings: ["cto", "it_manager"],
 } as const satisfies Record<string, readonly UserRole[]>;
-
-export const projectCostRoles: readonly UserRole[] = [
-  "cto",
-  "it_manager",
-  "resource_manager",
-  "finance_manager",
-];

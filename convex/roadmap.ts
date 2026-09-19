@@ -360,6 +360,18 @@ export const listProjectCostSummaries = query({
   },
 });
 
+export const listProjectCostMasterData = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireProjectCostAccess(ctx);
+    const [roleRates, resources] = await Promise.all([
+      ctx.db.query("project_role_rates").collect(),
+      ctx.db.query("project_resources").collect(),
+    ]);
+    return { roleRates, resources };
+  },
+});
+
 export const createProjectRoleRate = mutation({
   args: { name: v.string(), hourlyRate: v.number() },
   handler: async (ctx, args) => {

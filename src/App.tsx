@@ -16,6 +16,7 @@ const {
   architecture: ArchitecturePage,
   integrations: IntegrationsPage,
   roadmap: RoadmapPage,
+  costs: CostsPage,
   users: UsersPage,
   settings: SettingsPage,
   demands: DemandsPage,
@@ -82,6 +83,14 @@ export default function App() {
                 element={
                   <RequireRole roles={routeRoles.roadmap}>
                     <RoadmapPage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/costs"
+                element={
+                  <RequireRole roles={routeRoles.costs}>
+                    <CostsPage />
                   </RequireRole>
                 }
               />

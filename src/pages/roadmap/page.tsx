@@ -697,13 +697,15 @@ function RoadmapContent() {
           <div className="flex items-center gap-1 shrink-0 ml-2">
             {canViewProjectCosts && item.level === "project" && (
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="sm"
                 title="Quản lý chi phí"
-                className="h-7 w-7 cursor-pointer text-emerald-400"
+                className="h-7 gap-1.5 cursor-pointer"
+                disabled={!projectCost}
                 onClick={() => setCostProject(item)}
               >
                 <CircleDollarSign className="h-3.5 w-3.5" />
+                {projectCost ? "Chi phí" : "Đang tải..."}
               </Button>
             )}
             {canWrite && (

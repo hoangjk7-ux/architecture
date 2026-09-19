@@ -26,6 +26,7 @@ const translations: TranslationMap = {
   "nav.architecture": { vi: "Bản đồ kiến trúc", en: "Architecture map" },
   "nav.integrations": { vi: "Tích hợp", en: "Integrations" },
   "nav.roadmap": { vi: "Lộ trình", en: "Roadmap" },
+  "nav.costs": { vi: "Chi phí", en: "Costs" },
   "nav.users": { vi: "Người dùng & vai trò", en: "Users & roles" },
   "nav.settings": { vi: "Cấu hình", en: "Settings" },
   "app.title": { vi: "Nền tảng TechGov", en: "TechGov Platform" },

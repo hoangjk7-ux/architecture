@@ -20,6 +20,7 @@ describe("layout navigation", () => {
       "/demands",
       "/integrations",
       "/roadmap",
+      "/costs",
       "/users",
       "/settings",
     ]);

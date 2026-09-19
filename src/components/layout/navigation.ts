@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Users,
   ClipboardList,
+  CircleDollarSign,
   type LucideIcon,
 } from "lucide-react";
 import { routeRoles, type UserRole } from "@/lib/permissions.ts";
@@ -62,6 +63,12 @@ export const navigationItems: NavigationItem[] = [
     icon: ShieldCheck,
     labelKey: "nav.roadmap",
     roles: routeRoles.roadmap,
+  },
+  {
+    to: "/costs",
+    icon: CircleDollarSign,
+    labelKey: "nav.costs",
+    roles: routeRoles.costs,
   },
   {
     to: "/users",
