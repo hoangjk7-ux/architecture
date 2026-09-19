@@ -140,8 +140,12 @@ function RoadmapForm({
     key: K,
     value: RoadmapFormData[K],
   ) => setForm((current) => ({ ...current, [key]: value }));
+  const systemById = new Map(systems.map((system) => [system._id, system]));
   const parentCandidates = items.filter(
-    (item) => item.level === parentLevelOf[form.level],
+    (item) =>
+      item.level === parentLevelOf[form.level] &&
+      (item.level !== "project" ||
+        item.relatedSystemIds.some((systemId) => systemById.has(systemId))),
   );
   const handleSave = async () => {
     if (!form.title.trim()) return toast.error("Title is required");
@@ -265,7 +269,10 @@ function RoadmapForm({
                     value={item._id}
                     className="whitespace-normal"
                   >
-                    {item.title}
+                    {item.level === "project"
+                      ? (systemById.get(item.relatedSystemIds[0])?.name ??
+                        item.title)
+                      : item.title}
                   </SelectItem>
                 ))}
               </SelectContent>
