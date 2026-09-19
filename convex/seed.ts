@@ -907,36 +907,6 @@ export const seedData = internalMutation({
     });
 
     await ctx.db.insert("roadmap_items", {
-      title: "SD Query Performance Tuning",
-      level: "epic",
-      parentId: proj1a2Id,
-      status: "in_progress",
-      owner: "Nguyen Van An",
-      startDate: "2025-05-01",
-      dueDate: "2025-07-31",
-      architectureAlignmentScore: 78,
-      relatedSystemIds: [erpId],
-      priority: "high",
-      description:
-        "Identify and resolve N+1 queries, missing HANA indexes, and batch job contention in SD order processing.",
-    });
-
-    await ctx.db.insert("roadmap_items", {
-      title: "API Gateway HA Configuration",
-      level: "epic",
-      parentId: proj1b1Id,
-      status: "done",
-      owner: "Nguyen Thanh Long",
-      startDate: "2025-02-01",
-      dueDate: "2025-04-30",
-      architectureAlignmentScore: 90,
-      relatedSystemIds: [apiGatewayId],
-      priority: "high",
-      description:
-        "Configure active-active Kong Gateway cluster with automated failover and health checks.",
-    });
-
-    await ctx.db.insert("roadmap_items", {
       title: "Portal Authentication – SSO Integration",
       level: "epic",
       parentId: proj3a2Id,
@@ -1159,5 +1129,26 @@ export const seedData = internalMutation({
     });
 
     return { message: "Seed data inserted successfully." };
+  },
+});
+
+export const removeMisleadingRoadmapData = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("roadmap_items").collect();
+    const badPatterns = [
+      /sap\s*s\/4hana.*sd.*(optimization|tuning|module)/i,
+      /sd\s*module.*(optimization|tuning)/i,
+      /api\s*gateway.*(hardening|production)/i,
+      /production\s*hardening/i,
+      /module\s*optimization/i,
+    ];
+
+    for (const item of items) {
+      const haystack = `${item.title} ${item.description ?? ""}`;
+      if (badPatterns.some((pattern) => pattern.test(haystack))) {
+        await ctx.db.delete(item._id);
+      }
+    }
   },
 });
