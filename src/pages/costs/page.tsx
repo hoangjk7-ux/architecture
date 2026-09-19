@@ -42,6 +42,7 @@ const statuses: Record<string, string> = {
   done: "Hoàn thành",
   cancelled: "Đã hủy",
 };
+const personnelRoles = ["PM", "BA", "DEV"] as const;
 type Tab = "projects" | "resources" | "tco";
 
 export default function CostsPage() {
@@ -51,7 +52,6 @@ export default function CostsPage() {
   const master = useQuery(api.roadmap.listProjectCostMasterData);
   const createRate = useMutation(api.roadmap.createProjectRoleRate);
   const createResource = useMutation(api.roadmap.createProjectResource);
-  const createTask = useMutation(api.roadmap.createProjectTask);
   const createOther = useMutation(api.roadmap.createProjectNonLaborCost);
   const removeOther = useMutation(api.roadmap.removeProjectNonLaborCost);
   const [tab, setTab] = useState<Tab>("projects");
@@ -59,14 +59,6 @@ export default function CostsPage() {
   const [hourlyRate, setHourlyRate] = useState("");
   const [resourceName, setResourceName] = useState("");
   const [roleRateId, setRoleRateId] = useState("");
-  const [projectId, setProjectId] = useState("");
-  const [sprintId, setSprintId] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
-  const [taskTitle, setTaskTitle] = useState("");
-  const [phase, setPhase] = useState<"pre_uat" | "post_uat">("pre_uat");
-  const [estimated, setEstimated] = useState("");
-  const [actual, setActual] = useState("");
-  const [remaining, setRemaining] = useState("");
   const [otherProjectId, setOtherProjectId] = useState("");
   const [category, setCategory] =
     useState<keyof typeof categories>("server_domain");
@@ -86,8 +78,10 @@ export default function CostsPage() {
     inventorySystems[projects.indexOf(project) % inventorySystems.length]
       ?.name ??
     project.title;
-  const sprints = items.filter(
-    (item) => item.level === "sprint" && item.parentId === projectId,
+  const sprintNames = new Map(
+    items
+      .filter((item) => item.level === "sprint")
+      .map((sprint) => [sprint._id, sprint.title]),
   );
   const summaryByProject = new Map(
     summaries.map((summary) => [summary.projectId, summary]),
@@ -106,23 +100,6 @@ export default function CostsPage() {
     });
     setResourceName("");
     toast.success("Đã thêm nguồn lực");
-  };
-  const saveTask = async () => {
-    await createTask({
-      projectId: projectId as Id<"roadmap_items">,
-      sprintId: sprintId as Id<"roadmap_items">,
-      assigneeId: assigneeId as Id<"project_resources">,
-      title: taskTitle,
-      phase,
-      estimatedHours: Number(estimated),
-      actualHours: Number(actual),
-      remainingHours: Number(remaining),
-    });
-    setTaskTitle("");
-    setEstimated("");
-    setActual("");
-    setRemaining("");
-    toast.success("Đã thêm Task");
   };
   const saveOther = async () => {
     await createOther({
@@ -244,7 +221,9 @@ export default function CostsPage() {
         <div className="space-y-5">
           <div className="grid gap-5 xl:grid-cols-2">
             <section className="rounded-xl border bg-card p-4">
-              <h2 className="mb-3 font-semibold">Role & đơn giá theo giờ</h2>
+              <h2 className="mb-3 font-semibold">
+                Vai trò PM / BA / DEV và đơn giá
+              </h2>
               <div className="mb-3 flex flex-wrap gap-2">
                 {(master?.roleRates ?? []).map((rate) => (
                   <Badge key={rate._id}>
@@ -253,11 +232,18 @@ export default function CostsPage() {
                 ))}
               </div>
               <div className="flex gap-2">
-                <Input
-                  value={rateName}
-                  onChange={(e) => setRateName(e.target.value)}
-                  placeholder="Role: Dev, BA, PM"
-                />
+                <Select value={rateName} onValueChange={setRateName}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn vai trò" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {personnelRoles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
                   type="number"
                   value={hourlyRate}
@@ -273,11 +259,14 @@ export default function CostsPage() {
               </div>
             </section>
             <section className="rounded-xl border bg-card p-4">
-              <h2 className="mb-3 font-semibold">Resource Master</h2>
+              <h2 className="mb-3 font-semibold">Quản lý nhân sự</h2>
               <div className="mb-3 flex flex-wrap gap-2">
                 {(master?.resources ?? []).map((resource) => (
                   <Badge variant="secondary" key={resource._id}>
-                    {resource.name}
+                    {resource.name} ·{" "}
+                    {master?.roleRates.find(
+                      (rate) => rate._id === resource.roleRateId,
+                    )?.name ?? "Chưa có vai trò"}
                   </Badge>
                 ))}
               </div>
@@ -308,102 +297,64 @@ export default function CostsPage() {
               </div>
             </section>
           </div>
-          <section className="rounded-xl border bg-card p-4">
-            <h2 className="mb-1 font-semibold">Task Cost</h2>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Actual được tách Pre-UAT/Post-UAT; chi phí tự tính từ Assignee →
-              Role → Unit Rate → Hours.
-            </p>
-            <div className="grid gap-2 md:grid-cols-4">
-              <Select
-                value={projectId}
-                onValueChange={(value) => {
-                  setProjectId(value);
-                  setSprintId("");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p._id} value={p._id}>
-                      {projectName(p)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={sprintId} onValueChange={setSprintId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sprint" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sprints.map((s) => (
-                    <SelectItem key={s._id} value={s._id}>
-                      {s.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={assigneeId} onValueChange={setAssigneeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Assignee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(master?.resources ?? []).map((r) => (
-                    <SelectItem key={r._id} value={r._id}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                value={taskTitle}
-                onChange={(e) => setTaskTitle(e.target.value)}
-                placeholder="Tên Task"
-              />
-              <Select
-                value={phase}
-                onValueChange={(v) => setPhase(v as typeof phase)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pre_uat">Pre-UAT</SelectItem>
-                  <SelectItem value="post_uat">Post-UAT</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                value={estimated}
-                onChange={(e) => setEstimated(e.target.value)}
-                placeholder="Estimated hours"
-              />
-              <Input
-                type="number"
-                value={actual}
-                onChange={(e) => setActual(e.target.value)}
-                placeholder="Actual hours"
-              />
-              <Input
-                type="number"
-                value={remaining}
-                onChange={(e) => setRemaining(e.target.value)}
-                placeholder="Remaining hours"
-              />
+          <section className="overflow-x-auto rounded-xl border bg-card">
+            <div className="border-b p-4">
+              <h2 className="font-semibold">Task theo Sprint</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Task được tạo tại Roadmap. Màn hình này chỉ tham chiếu số giờ và
+                chi phí đã tính.
+              </p>
             </div>
-            <Button
-              className="mt-3"
-              disabled={!projectId || !sprintId || !assigneeId || !taskTitle}
-              onClick={() => void saveTask()}
-            >
-              Thêm Task
-            </Button>
-            <div className="mt-4 text-xs text-muted-foreground">
-              {summaries.flatMap((summary) => summary.tasks).length} Task đang
-              được roll-up vào chi phí Project.
-            </div>
+            <table className="w-full min-w-[960px] text-sm">
+              <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+                <tr>
+                  {[
+                    "Dự án",
+                    "Sprint",
+                    "Task",
+                    "Assignee",
+                    "Phase",
+                    "Estimated",
+                    "Actual",
+                    "Remaining",
+                    "Forecast cost",
+                  ].map((label) => (
+                    <th key={label} className="px-4 py-3 font-medium">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {summaries.flatMap((summary) =>
+                  summary.tasks.map((task) => (
+                    <tr key={task._id} className="hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">
+                        {projectName(
+                          projects.find(
+                            (project) => project._id === summary.projectId,
+                          )!,
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {sprintNames.get(task.sprintId) ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">{task.title}</td>
+                      <td className="px-4 py-3">{task.assigneeName}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant="secondary">{task.phase}</Badge>
+                      </td>
+                      <td className="px-4 py-3">{task.estimatedHours}h</td>
+                      <td className="px-4 py-3">{task.actualHours}h</td>
+                      <td className="px-4 py-3">{task.remainingHours}h</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatVnd(task.forecastCost)}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
           </section>
         </div>
       )}

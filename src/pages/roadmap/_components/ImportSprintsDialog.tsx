@@ -17,6 +17,7 @@ import type { SprintImport } from "@/convex/domain/roadmapImport.ts";
 import type { Id, Doc } from "@/convex/_generated/dataModel.d.ts";
 
 type RoadmapItem = Doc<"roadmap_items">;
+type SoftwareSystem = Doc<"software_systems">;
 
 // Picks the sheet the Gantt "Sprint -> Luồng -> Task" timeline lives on: a
 // tab whose name mentions "timeline"/"tiến độ", falling back to the first
@@ -45,13 +46,21 @@ async function parseWorkbook(file: File): Promise<SprintImport[]> {
 
 export function ImportSprintsDialog({
   items,
+  systems,
   onClose,
 }: {
   items: RoadmapItem[];
+  systems: SoftwareSystem[];
   onClose: () => void;
 }) {
   const importSprints = useMutation(api.roadmap.importSprints);
-  const projects = items.filter((i) => i.level === "project");
+  const roadmapProjects = items.filter((item) => item.level === "project");
+  const projects = systems.flatMap((system) => {
+    const project = roadmapProjects.find((item) =>
+      item.relatedSystemIds.includes(system._id),
+    );
+    return project ? [{ id: project._id, name: system.name }] : [];
+  });
   const [projectId, setProjectId] = useState<Id<"roadmap_items"> | "">("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [parsed, setParsed] = useState<SprintImport[] | null>(null);
@@ -121,9 +130,9 @@ export function ImportSprintsDialog({
               <SelectValue placeholder="Chọn project" />
             </SelectTrigger>
             <SelectContent>
-              {projects.map((p) => (
-                <SelectItem key={p._id} value={p._id}>
-                  {p.title}
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
                 </SelectItem>
               ))}
             </SelectContent>

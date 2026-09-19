@@ -1,17 +1,21 @@
 import { useState } from "react";
-import { useQuery, useMutation, useConvexAuth } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Doc } from "@/convex/_generated/dataModel.d.ts";
+import { useCurrentUser } from "@/hooks/use-current-user.ts";
+import { cn } from "@/lib/utils.ts";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge.tsx";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import {
   Select,
   SelectContent,
@@ -19,65 +23,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import { toast } from "sonner";
 import {
+  ChevronRight,
+  Edit,
+  FileSpreadsheet,
   Plus,
   ShieldCheck,
-  Edit,
   Trash2,
-  ChevronRight,
-  FileSpreadsheet,
-  CircleDollarSign,
 } from "lucide-react";
-import { useCurrentUser } from "@/hooks/use-current-user.ts";
-import { cn } from "@/lib/utils.ts";
-import { formatVnd } from "@/lib/format.ts";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { ImportSprintsDialog } from "./_components/ImportSprintsDialog.tsx";
 
 type RoadmapItem = Doc<"roadmap_items">;
 type SoftwareSystem = Doc<"software_systems">;
-const legacySystemNames = new Set([
-  "SAP S/4HANA",
-  "Salesforce Sales Cloud",
-  "SAP SuccessFactors",
-  "ServiceNow ITSM",
-  "Oracle E-Business Suite",
-  "Microsoft Power BI",
-  "Microsoft 365",
-  "API Gateway (Internal)",
-  "Snowflake Data Warehouse",
-  "Customer Self-Service Portal",
-]);
-type ProjectCostSummary = {
-  projectId: Id<"roadmap_items">;
-  budgetCost: number;
-  forecastCost: number;
-  actualCost: number;
-  remainingCost: number;
-  usedPercent: number;
-  internalPreUat: number;
-  internalPostUat: number;
-  internalResourceCost: number;
-  initialCost: number;
-  monthlyCost: number;
-  annualCost: number;
-  year1Cost: number;
-  year2AnnualRunRate: number;
-  nonLaborCosts: Doc<"project_non_labor_costs">[];
+type ProjectResource = Doc<"project_resources">;
+type RoadmapLevel = RoadmapItem["level"];
+type RoadmapStatus = RoadmapItem["status"];
+type RoadmapPriority = RoadmapItem["priority"];
+
+const levelOrder: RoadmapLevel[] = [
+  "initiative",
+  "program",
+  "project",
+  "epic",
+  "sprint",
+  "workstream",
+];
+const parentLevelOf: Record<RoadmapLevel, RoadmapLevel | null> = {
+  initiative: null,
+  program: "initiative",
+  project: "program",
+  epic: "project",
+  sprint: "project",
+  workstream: "sprint",
 };
-
-const costCategories = {
-  server_domain: "Server / Domain",
-  cloud_infrastructure: "Cloud / Infrastructure",
-  software_license: "Software / License",
-  outsource_vendor: "Outsource / Vendor",
-  other: "Other",
-} as const;
-
-const statusConfig = {
+const statusConfig: Record<
+  RoadmapStatus,
+  { label: string; color: string; bg: string }
+> = {
   not_started: {
     label: "Not Started",
     color: "text-muted-foreground",
@@ -95,16 +79,7 @@ const statusConfig = {
     color: "text-muted-foreground",
     bg: "bg-muted/30",
   },
-} as const;
-
-const levelOrder = [
-  "initiative",
-  "program",
-  "project",
-  "epic",
-  "sprint",
-  "workstream",
-] as const;
+};
 const levelLabels: Record<RoadmapLevel, string> = {
   initiative: "Sáng kiến",
   program: "Chương trình",
@@ -114,33 +89,10 @@ const levelLabels: Record<RoadmapLevel, string> = {
   workstream: "Luồng công việc",
 };
 
-type RoadmapLevel = (typeof levelOrder)[number];
-
-// "sprint" is a sibling of "epic" (both attach under "project"), so the
-// naive levelOrder[index - 1] trick that works for the strictly linear
-// initiative -> program -> project -> epic chain doesn't hold once sprint
-// branches off it. Mirrors requiredParentLevel in
-// convex/domain/roadmap.ts.
-const parentLevelOf: Record<RoadmapLevel, RoadmapLevel | null> = {
-  initiative: null,
-  program: "initiative",
-  project: "program",
-  epic: "project",
-  sprint: "project",
-  workstream: "sprint",
-};
-type RoadmapStatus =
-  | "not_started"
-  | "in_progress"
-  | "blocked"
-  | "done"
-  | "cancelled";
-type RoadmapPriority = "high" | "medium" | "low";
-
 type RoadmapFormData = {
   title: string;
   level: RoadmapLevel;
-  parentId: Id<"roadmap_items"> | undefined;
+  parentId?: Id<"roadmap_items">;
   status: RoadmapStatus;
   owner: string;
   startDate: string;
@@ -154,7 +106,6 @@ type RoadmapFormData = {
 const defaultForm: RoadmapFormData = {
   title: "",
   level: "initiative",
-  parentId: undefined,
   status: "not_started",
   owner: "",
   startDate: "",
@@ -167,105 +118,60 @@ const defaultForm: RoadmapFormData = {
 
 function RoadmapForm({
   initial,
-  onSave,
-  onClose,
   items,
   systems,
+  resources,
+  onSave,
+  onClose,
 }: {
-  initial?: Partial<RoadmapFormData> & { _id?: Id<"roadmap_items"> };
-  onSave: (data: RoadmapFormData) => Promise<void>;
-  onClose: () => void;
+  initial?: Partial<RoadmapFormData>;
   items: RoadmapItem[];
   systems: SoftwareSystem[];
+  resources: ProjectResource[];
+  onSave: (data: RoadmapFormData) => Promise<void>;
+  onClose: () => void;
 }) {
-  const [form, setForm] = useState<RoadmapFormData>(() => {
-    const src = (initial ?? {}) as Record<string, unknown>;
-    return Object.keys(defaultForm).reduce<RoadmapFormData>(
-      (acc, k) => ({
-        ...acc,
-        [k]: k in src ? src[k] : defaultForm[k as keyof RoadmapFormData],
-      }),
-      { ...defaultForm },
-    );
+  const [form, setForm] = useState<RoadmapFormData>({
+    ...defaultForm,
+    ...initial,
   });
   const [saving, setSaving] = useState(false);
-  const [scopeProjectId, setScopeProjectId] = useState<
-    Id<"roadmap_items"> | undefined
-  >(() => {
-    const parent = items.find((item) => item._id === initial?.parentId);
-    return parent?.level === "sprint" ? parent.parentId : undefined;
-  });
-  const set = <K extends keyof typeof defaultForm>(
-    k: K,
-    v: (typeof defaultForm)[K],
-  ) => setForm((f) => ({ ...f, [k]: v }));
-
+  const set = <K extends keyof RoadmapFormData>(
+    key: K,
+    value: RoadmapFormData[K],
+  ) => setForm((current) => ({ ...current, [key]: value }));
   const parentCandidates = items.filter(
-    (i) => i.level === parentLevelOf[form.level],
+    (item) => item.level === parentLevelOf[form.level],
   );
-  const systemNames = new Map(
-    systems.map((system) => [system._id, system.name]),
-  );
-  const projectCandidates = items.filter(
-    (item) =>
-      item.level === "project" && systemNames.has(item.relatedSystemIds[0]),
-  );
-  const sprintCandidates = items.filter(
-    (item) => item.level === "sprint" && item.parentId === scopeProjectId,
-  );
-  const projectLabel = (project: RoadmapItem) =>
-    systemNames.get(project.relatedSystemIds[0]) ?? project.title;
-
   const handleSave = async () => {
-    if (form.level === "project" && form.relatedSystemIds.length === 0) {
-      toast.error("Hãy chọn hệ thống từ Kho hệ thống");
-      return;
-    }
-    if (parentLevelOf[form.level] && !form.parentId) {
-      toast.error(
-        form.level === "workstream"
-          ? "Hãy chọn Sprint thuộc dự án"
-          : "Hãy chọn cấp cha",
-      );
-      return;
-    }
-    if (!form.title.trim()) {
-      toast.error("Title is required");
-      return;
-    }
+    if (!form.title.trim()) return toast.error("Title is required");
+    if (form.level === "project" && form.relatedSystemIds.length !== 1)
+      return toast.error("Hãy chọn một hệ thống cho dự án");
+    if (parentLevelOf[form.level] && !form.parentId)
+      return toast.error("Hãy chọn cấp cha");
     setSaving(true);
     try {
-      await onSave(form);
+      await onSave({ ...form, title: form.title.trim() });
       onClose();
-    } catch (err: unknown) {
-      toast.error(
-        (err as { data?: { message?: string } })?.data?.message ??
-          (err instanceof Error ? err.message : "Failed to save"),
-      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể lưu");
     } finally {
       setSaving(false);
     }
   };
-
   return (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+    <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
       <div className="grid grid-cols-2 gap-4">
-        {form.level === "project" ? (
-          <div className="col-span-2 space-y-1">
-            <Label>Hệ thống *</Label>
+        <div className="col-span-2 space-y-1">
+          <Label>{form.level === "project" ? "Hệ thống *" : "Title *"}</Label>
+          {form.level === "project" ? (
             <Select
               value={form.relatedSystemIds[0] ?? ""}
-              onValueChange={(value) => {
-                const system = systems.find((item) => item._id === value);
-                if (!system) return;
-                setForm((current) => ({
-                  ...current,
-                  title: system.name,
-                  relatedSystemIds: [system._id],
-                }));
-              }}
+              onValueChange={(value) =>
+                set("relatedSystemIds", [value as Id<"software_systems">])
+              }
             >
-              <SelectTrigger className="bg-input">
+              <SelectTrigger>
                 <SelectValue placeholder="Chọn từ Kho hệ thống" />
               </SelectTrigger>
               <SelectContent>
@@ -276,40 +182,27 @@ function RoadmapForm({
                 ))}
               </SelectContent>
             </Select>
-            {systems.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Chưa có dữ liệu trong Kho hệ thống.
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="col-span-2 space-y-1">
-            <Label>Title *</Label>
+          ) : (
             <Input
               value={form.title}
-              onChange={(e) => set("title", e.target.value)}
-              placeholder="e.g. Digital Campus Initiative"
+              onChange={(event) => set("title", event.target.value)}
               className="bg-input"
             />
-          </div>
-        )}
+          )}
+        </div>
         <div className="space-y-1">
           <Label>Cấp lộ trình</Label>
           <Select
             value={form.level}
-            onValueChange={(v) => {
-              set("level", v as typeof form.level);
-              set("parentId", undefined);
-              setScopeProjectId(undefined);
-            }}
+            onValueChange={(value) => set("level", value as RoadmapLevel)}
           >
-            <SelectTrigger className="bg-input">
+            <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {levelOrder.map((l) => (
-                <SelectItem key={l} value={l} className="capitalize">
-                  {levelLabels[l]}
+              {levelOrder.map((level) => (
+                <SelectItem key={level} value={level}>
+                  {levelLabels[level]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -319,15 +212,15 @@ function RoadmapForm({
           <Label>Status</Label>
           <Select
             value={form.status}
-            onValueChange={(v) => set("status", v as typeof form.status)}
+            onValueChange={(value) => set("status", value as RoadmapStatus)}
           >
-            <SelectTrigger className="bg-input">
+            <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(statusConfig).map(([k, v]) => (
-                <SelectItem key={k} value={k}>
-                  {v.label}
+              {Object.entries(statusConfig).map(([value, config]) => (
+                <SelectItem key={value} value={value}>
+                  {config.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -337,88 +230,38 @@ function RoadmapForm({
           <Label>Priority</Label>
           <Select
             value={form.priority}
-            onValueChange={(v) => set("priority", v as typeof form.priority)}
+            onValueChange={(value) => set("priority", value as RoadmapPriority)}
           >
-            <SelectTrigger className="bg-input">
+            <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
+              {["high", "medium", "low"].map((value) => (
+                <SelectItem key={value} value={value}>
+                  {value}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        {form.level === "workstream" && (
-          <>
-            <div className="space-y-1">
-              <Label>Dự án *</Label>
-              <Select
-                value={scopeProjectId ?? ""}
-                onValueChange={(value) => {
-                  setScopeProjectId(value as Id<"roadmap_items">);
-                  set("parentId", undefined);
-                }}
-              >
-                <SelectTrigger className="bg-input">
-                  <SelectValue placeholder="Chọn dự án" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectCandidates.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      {projectLabel(project)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Sprint *</Label>
-              <Select
-                value={form.parentId ?? ""}
-                onValueChange={(value) =>
-                  set("parentId", value as Id<"roadmap_items">)
-                }
-                disabled={!scopeProjectId}
-              >
-                <SelectTrigger className="bg-input">
-                  <SelectValue placeholder="Chọn Sprint của dự án" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sprintCandidates.map((sprint) => (
-                    <SelectItem key={sprint._id} value={sprint._id}>
-                      {sprint.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </>
-        )}
-        {form.level !== "workstream" && parentCandidates.length > 0 && (
+        {parentLevelOf[form.level] && (
           <div className="space-y-1">
-            <Label>
-              {form.level === "sprint" || form.level === "epic"
-                ? "Dự án *"
-                : "Cấp cha *"}
-            </Label>
+            <Label>Cấp cha *</Label>
             <Select
-              value={form.parentId ?? "none"}
-              onValueChange={(v) =>
-                set(
-                  "parentId",
-                  v === "none" ? undefined : (v as Id<"roadmap_items">),
-                )
+              value={form.parentId ?? ""}
+              onValueChange={(value) =>
+                set("parentId", value as Id<"roadmap_items">)
               }
             >
-              <SelectTrigger className="bg-input">
-                <SelectValue placeholder="None" />
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={`Chọn ${levelLabels[parentLevelOf[form.level]!]}`}
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {parentCandidates.map((i) => (
-                  <SelectItem key={i._id} value={i._id}>
-                    {i.level === "project" ? projectLabel(i) : i.title}
+                {parentCandidates.map((item) => (
+                  <SelectItem key={item._id} value={item._id}>
+                    {item.title}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -426,21 +269,50 @@ function RoadmapForm({
           </div>
         )}
         <div className="space-y-1">
-          <Label>Owner</Label>
-          <Input
-            value={form.owner}
-            onChange={(e) => set("owner", e.target.value)}
-            placeholder="e.g. IT Lead"
-            className="bg-input"
-          />
+          <Label>
+            {form.level === "project" ? "Phụ trách dự án" : "Owner"}
+          </Label>
+          {form.level === "project" ? (
+            <Select
+              value={
+                resources.find((resource) => resource.name === form.owner)
+                  ?._id ?? "none"
+              }
+              onValueChange={(value) =>
+                set(
+                  "owner",
+                  value === "none"
+                    ? ""
+                    : (resources.find((resource) => resource._id === value)
+                        ?.name ?? ""),
+                )
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Chọn PM / BA / DEV" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Chưa phân công</SelectItem>
+                {resources.map((resource) => (
+                  <SelectItem key={resource._id} value={resource._id}>
+                    {resource.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={form.owner}
+              onChange={(event) => set("owner", event.target.value)}
+            />
+          )}
         </div>
         <div className="space-y-1">
           <Label>Start Date</Label>
           <Input
             type="date"
             value={form.startDate}
-            onChange={(e) => set("startDate", e.target.value)}
-            className="bg-input"
+            onChange={(event) => set("startDate", event.target.value)}
           />
         </div>
         <div className="space-y-1">
@@ -448,8 +320,7 @@ function RoadmapForm({
           <Input
             type="date"
             value={form.dueDate}
-            onChange={(e) => set("dueDate", e.target.value)}
-            className="bg-input"
+            onChange={(event) => set("dueDate", event.target.value)}
           />
         </div>
         <div className="col-span-2 space-y-1">
@@ -459,28 +330,25 @@ function RoadmapForm({
             min={0}
             max={100}
             value={form.architectureAlignmentScore}
-            onChange={(e) =>
-              set("architectureAlignmentScore", Number(e.target.value))
+            onChange={(event) =>
+              set("architectureAlignmentScore", Number(event.target.value))
             }
-            className="bg-input"
           />
         </div>
         <div className="col-span-2 space-y-1">
           <Label>Description</Label>
           <Textarea
             value={form.description}
-            onChange={(e) => set("description", e.target.value)}
-            placeholder="Describe this roadmap item..."
-            className="bg-input"
+            onChange={(event) => set("description", event.target.value)}
             rows={2}
           />
         </div>
       </div>
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onClose} disabled={saving}>
+        <Button variant="ghost" onClick={onClose}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={saving}>
+        <Button onClick={() => void handleSave()} disabled={saving}>
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
@@ -488,176 +356,124 @@ function RoadmapForm({
   );
 }
 
-function ProjectCostDialog({
-  project,
-  summary,
+function TaskDialog({
+  projectId,
+  sprintId,
+  resources,
   onClose,
 }: {
-  project: RoadmapItem;
-  summary: ProjectCostSummary;
+  projectId: Id<"roadmap_items">;
+  sprintId: Id<"roadmap_items">;
+  resources: Doc<"project_resources">[];
   onClose: () => void;
 }) {
-  const createCost = useMutation(api.roadmap.createProjectNonLaborCost);
-  const removeCost = useMutation(api.roadmap.removeProjectNonLaborCost);
-  const [category, setCategory] =
-    useState<keyof typeof costCategories>("server_domain");
-  const [costType, setCostType] = useState<"initial" | "monthly" | "annual">(
-    "initial",
-  );
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
+  const createTask = useMutation(api.roadmap.createProjectTask);
+  const [title, setTitle] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [phase, setPhase] = useState<"pre_uat" | "post_uat">("pre_uat");
+  const [estimatedHours, setEstimatedHours] = useState("");
+  const [actualHours, setActualHours] = useState("0");
+  const [remainingHours, setRemainingHours] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const addCost = async () => {
-    if (!amount || Number(amount) < 0) return;
+  const save = async () => {
     setSaving(true);
     try {
-      await createCost({
-        projectId: project._id,
-        category,
-        costType,
-        amount: Number(amount),
-        description: description || undefined,
+      await createTask({
+        projectId,
+        sprintId,
+        title,
+        assigneeId: assigneeId as Id<"project_resources">,
+        phase,
+        estimatedHours: Number(estimatedHours),
+        actualHours: Number(actualHours),
+        remainingHours: Number(remainingHours),
       });
-      setAmount("");
-      setDescription("");
-      toast.success("Đã thêm chi phí");
+      toast.success("Đã thêm Task vào Sprint");
+      onClose();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Không thể tạo Task",
+      );
     } finally {
       setSaving(false);
     }
   };
-
-  const metrics = [
-    ["Budget", summary.budgetCost],
-    ["Forecast", summary.forecastCost],
-    ["Actual", summary.actualCost],
-    ["Remaining", summary.remainingCost],
-  ] as const;
-
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl bg-card border-border">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Chi phí dự án · {project.title}</DialogTitle>
+          <DialogTitle>Thêm Task vào Sprint</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[75vh] space-y-4 overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            {metrics.map(([label, value]) => (
-              <div key={label} className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">{label}</div>
-                <div className="mt-1 font-semibold">{formatVnd(value)}</div>
-              </div>
-            ))}
-            <div className="rounded-lg border p-3">
-              <div className="text-xs text-muted-foreground">Used</div>
-              <div className="mt-1 font-semibold">{summary.usedPercent}%</div>
-            </div>
+        <div className="space-y-3">
+          <div>
+            <Label>Tên Task *</Label>
+            <Input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
           </div>
-
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg bg-muted/30 p-3 text-sm">
-              Pre-UAT
-              <br />
-              <strong>{formatVnd(summary.internalPreUat)}</strong>
-            </div>
-            <div className="rounded-lg bg-muted/30 p-3 text-sm">
-              Post-UAT
-              <br />
-              <strong>{formatVnd(summary.internalPostUat)}</strong>
-            </div>
-            <div className="rounded-lg bg-muted/30 p-3 text-sm">
-              Tổng Năm 1<br />
-              <strong>{formatVnd(summary.year1Cost)}</strong>
-            </div>
-            <div className="rounded-lg bg-muted/30 p-3 text-sm">
-              Duy trì từ Năm 2<br />
-              <strong>{formatVnd(summary.year2AnnualRunRate)}</strong>
-            </div>
-          </div>
-
-          <div className="rounded-lg border">
-            <div className="border-b px-4 py-3 text-sm font-semibold">
-              Chi phí khác
-            </div>
-            <div className="divide-y">
-              {summary.nonLaborCosts.length === 0 && (
-                <div className="p-4 text-sm text-muted-foreground">
-                  Chưa có chi phí khác.
-                </div>
-              )}
-              {summary.nonLaborCosts.map((cost) => (
-                <div
-                  key={cost._id}
-                  className="flex items-center gap-3 px-4 py-2"
-                >
-                  <span className="w-24 text-sm">
-                    {costCategories[cost.category]}
-                  </span>
-                  <Badge variant="secondary" className="capitalize">
-                    {cost.costType}
-                  </Badge>
-                  <span className="flex-1 truncate text-xs text-muted-foreground">
-                    {cost.description}
-                  </span>
-                  <strong className="text-sm">{formatVnd(cost.amount)}</strong>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => void removeCost({ id: cost._id })}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_1fr_1fr_1.5fr_auto]">
-            <Select
-              value={category}
-              onValueChange={(v) =>
-                setCategory(v as keyof typeof costCategories)
-              }
-            >
+          <div>
+            <Label>Assignee *</Label>
+            <Select value={assigneeId} onValueChange={setAssigneeId}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Chọn nguồn lực" />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(costCategories).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
+                {resources.map((resource) => (
+                  <SelectItem key={resource._id} value={resource._id}>
+                    {resource.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>Giai đoạn</Label>
             <Select
-              value={costType}
-              onValueChange={(v) => setCostType(v as typeof costType)}
+              value={phase}
+              onValueChange={(value) => setPhase(value as typeof phase)}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="initial">Initial</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="annual">Annual</SelectItem>
+                <SelectItem value="pre_uat">Pre-UAT</SelectItem>
+                <SelectItem value="post_uat">Post-UAT</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
             <Input
               type="number"
               min={0}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Số tiền"
+              placeholder="Estimated"
+              value={estimatedHours}
+              onChange={(event) => setEstimatedHours(event.target.value)}
             />
             <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Mô tả"
+              type="number"
+              min={0}
+              placeholder="Actual"
+              value={actualHours}
+              onChange={(event) => setActualHours(event.target.value)}
             />
-            <Button disabled={saving || !amount} onClick={() => void addCost()}>
-              Thêm
+            <Input
+              type="number"
+              min={0}
+              placeholder="Remaining"
+              value={remainingHours}
+              onChange={(event) => setRemainingHours(event.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Hủy
+            </Button>
+            <Button
+              disabled={!title || !assigneeId || !estimatedHours || saving}
+              onClick={() => void save()}
+            >
+              Tạo Task
             </Button>
           </div>
         </div>
@@ -670,155 +486,73 @@ function RoadmapContent() {
   const { canWrite, canViewProjectCosts } = useCurrentUser();
   const rawItems = useQuery(api.roadmap.list);
   const systems = useQuery(api.software_systems.list) ?? [];
-  const costSummaries = useQuery(
-    api.roadmap.listProjectCostSummaries,
+  const master = useQuery(
+    api.roadmap.listProjectCostMasterData,
     canViewProjectCosts ? {} : "skip",
   );
-  const costsByProject = new Map(
-    (costSummaries ?? []).map((summary) => [summary.projectId, summary]),
-  );
   const items = rawItems ?? [];
-  const inventorySystems = systems.filter(
-    (system) => !legacySystemNames.has(system.name),
-  );
-  const systemById = new Map(
-    inventorySystems.map((system) => [system._id, system]),
-  );
-  const allProjects = items.filter((item) => item.level === "project");
-  const projectName = (project: RoadmapItem) =>
-    systemById.get(project.relatedSystemIds[0])?.name ??
-    inventorySystems[allProjects.indexOf(project) % inventorySystems.length]
-      ?.name ??
-    project.title;
-  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
-  const stats = useQuery(
-    api.roadmap.getStats,
-    !isConvexAuthenticated ? "skip" : undefined,
-  );
+  const projects = items.filter((item) => item.level === "project");
+  const stats = useQuery(api.roadmap.getStats);
   const createItem = useMutation(api.roadmap.create);
   const updateItem = useMutation(api.roadmap.update);
   const removeItem = useMutation(api.roadmap.remove);
-
   const [showForm, setShowForm] = useState(false);
-  const [showImport, setShowImport] = useState(false);
   const [editing, setEditing] = useState<RoadmapItem | null>(null);
-  const [costProject, setCostProject] = useState<RoadmapItem | null>(null);
+  const [taskSprint, setTaskSprint] = useState<RoadmapItem | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const [filterLevel, setFilterLevel] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-
-  const filtered = items.filter((i) => {
-    const matchLevel = filterLevel === "all" || i.level === filterLevel;
-    const matchStatus = filterStatus === "all" || i.status === filterStatus;
-    return matchLevel && matchStatus;
-  });
-
-  // Group by level for tree view
-  const initiatives = filtered.filter((i) => i.level === "initiative");
-  const programs = filtered.filter((i) => i.level === "program");
-  const projects = filtered.filter((i) => i.level === "project");
-  const sprints = filtered.filter((i) => i.level === "sprint");
-  const workstreams = filtered.filter((i) => i.level === "workstream");
-
-  const handleCreate = async (data: RoadmapFormData) => {
-    await createItem(data);
-    toast.success("Added");
-  };
-  const handleUpdate = async (data: RoadmapFormData) => {
-    if (!editing) return;
-    await updateItem({ id: editing._id, ...data });
-    toast.success("Updated");
-    setEditing(null);
-  };
-
-  const today = new Date().toISOString().split("T")[0];
-
+  const filtered = items.filter(
+    (item) =>
+      (filterLevel === "all" || item.level === filterLevel) &&
+      (filterStatus === "all" || item.status === filterStatus),
+  );
+  const projectForSprint = (sprint: RoadmapItem) =>
+    projects.find((project) => project._id === sprint.parentId);
   const renderItem = (item: RoadmapItem, indent = 0) => {
-    const cfg = statusConfig[item.status];
-    const projectCost = costsByProject.get(item._id);
-    const isOverdue =
-      item.dueDate && item.dueDate < today && item.status !== "done";
+    const config = statusConfig[item.status];
+    const children = filtered.filter((child) => child.parentId === item._id);
+    const project = projectForSprint(item);
     return (
       <div
         key={item._id}
         className={cn(
-          "flex items-start justify-between p-3 rounded-lg border border-border hover:bg-accent/30 transition-colors",
+          "rounded-lg border border-border p-3",
           indent > 0 && "ml-6 mt-1",
         )}
       >
-        <div className="flex items-start gap-2 flex-1 min-w-0">
-          {indent > 0 && (
-            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-sm truncate">
-                {item.level === "project" ? projectName(item) : item.title}
-              </span>
-              <Badge
-                variant="secondary"
-                className="text-[10px] capitalize shrink-0"
-              >
-                {item.level}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-sm font-medium">{item.title}</span>
+              <Badge variant="secondary" className="text-[10px]">
+                {levelLabels[item.level]}
               </Badge>
               <span
                 className={cn(
-                  "text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0",
-                  cfg.bg,
-                  cfg.color,
+                  "rounded px-1.5 py-0.5 text-[10px]",
+                  config.bg,
+                  config.color,
                 )}
               >
-                {cfg.label}
+                {config.label}
               </span>
-              {isOverdue && (
-                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px]">
-                  Overdue
-                </Badge>
-              )}
-              {item.priority === "high" && (
-                <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-[10px]">
-                  High Priority
-                </Badge>
-              )}
             </div>
-            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+            <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
               {item.owner && <span>{item.owner}</span>}
               {item.dueDate && <span>Due: {item.dueDate}</span>}
-              <span>
-                Alignment:{" "}
-                <span
-                  className={
-                    item.architectureAlignmentScore >= 70
-                      ? "text-green-400"
-                      : "text-yellow-400"
-                  }
-                >
-                  {item.architectureAlignmentScore}%
-                </span>
-              </span>
-              {item.level === "project" && projectCost && (
-                <>
-                  <span>Năm 1: {formatVnd(projectCost.year1Cost)}</span>
-                  <span>
-                    Duy trì/năm: {formatVnd(projectCost.year2AnnualRunRate)}
-                  </span>
-                </>
-              )}
+              <span>Alignment: {item.architectureAlignmentScore}%</span>
             </div>
           </div>
-        </div>
-        {(canWrite || (canViewProjectCosts && item.level === "project")) && (
-          <div className="flex items-center gap-1 shrink-0 ml-2">
-            {canViewProjectCosts && item.level === "project" && (
+          <div className="flex shrink-0 items-center gap-1">
+            {item.level === "sprint" && project && canViewProjectCosts && (
               <Button
                 variant="outline"
                 size="sm"
-                title="Quản lý chi phí"
-                className="h-7 gap-1.5 cursor-pointer"
-                disabled={!projectCost}
-                onClick={() => setCostProject(item)}
+                onClick={() => setTaskSprint(item)}
               >
-                <CircleDollarSign className="h-3.5 w-3.5" />
-                {projectCost ? "Chi phí" : "Đang tải..."}
+                <Plus className="mr-1 h-3 w-3" />
+                Task
               </Button>
             )}
             {canWrite && (
@@ -826,7 +560,6 @@ function RoadmapContent() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 cursor-pointer"
                   onClick={() => setEditing(item)}
                 >
                   <Edit className="h-3 w-3" />
@@ -834,178 +567,133 @@ function RoadmapContent() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 cursor-pointer text-destructive hover:text-destructive"
-                  onClick={() => {
-                    removeItem({ id: item._id });
-                    toast.success("Removed");
-                  }}
+                  className="text-destructive"
+                  onClick={() => void removeItem({ id: item._id })}
                 >
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </>
             )}
           </div>
-        )}
+        </div>
+        {children.map((child) => (
+          <div key={child._id}>
+            <ChevronRight className="ml-2 mt-2 h-3 w-3 text-muted-foreground" />
+            {renderItem(child, indent + 1)}
+          </div>
+        ))}
       </div>
     );
   };
-
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Technology Roadmap</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {items.length} items tracked
           </p>
         </div>
         {canWrite && (
           <div className="flex gap-2">
             <Button
-              onClick={() => setShowImport(true)}
-              size="sm"
               variant="outline"
-              className="gap-2"
+              size="sm"
+              onClick={() => setShowImport(true)}
             >
-              <FileSpreadsheet className="h-4 w-4" />
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
               Nhập Sprint từ Excel
             </Button>
-            <Button
-              onClick={() => setShowForm(true)}
-              size="sm"
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
+            <Button size="sm" onClick={() => setShowForm(true)}>
+              <Plus className="mr-2 h-4 w-4" />
               Add Item
             </Button>
           </div>
         )}
       </div>
-
-      {/* Stats */}
-      {stats && stats.total > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div className="bg-card border border-border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-primary">
-              {stats.completionRate}%
+      {stats && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          {[
+            ["Complete", `${stats.completionRate}%`],
+            ["In Progress", stats.inProgress],
+            ["Blocked", stats.blocked],
+            ["Overdue", stats.overdue],
+            ["Alignment", `${stats.avgAlignmentScore}%`],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-lg border bg-card p-3 text-center"
+            >
+              <div className="text-xl font-bold">{value}</div>
+              <div className="text-xs text-muted-foreground">{label}</div>
             </div>
-            <div className="text-xs text-muted-foreground">Complete</div>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-blue-400">
-              {stats.inProgress}
-            </div>
-            <div className="text-xs text-muted-foreground">In Progress</div>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-red-400">
-              {stats.blocked}
-            </div>
-            <div className="text-xs text-muted-foreground">Blocked</div>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-orange-400">
-              {stats.overdue}
-            </div>
-            <div className="text-xs text-muted-foreground">Overdue</div>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-primary">
-              {stats.avgAlignmentScore}%
-            </div>
-            <div className="text-xs text-muted-foreground">Avg Alignment</div>
-          </div>
+          ))}
         </div>
       )}
-
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-wrap gap-3">
         <Select value={filterLevel} onValueChange={setFilterLevel}>
-          <SelectTrigger className="w-36 bg-input">
+          <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Levels</SelectItem>
-            {levelOrder.map((l) => (
-              <SelectItem key={l} value={l} className="capitalize">
-                {l}
+            {levelOrder.map((level) => (
+              <SelectItem key={level} value={level}>
+                {levelLabels[level]}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-36 bg-input">
+          <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            {Object.entries(statusConfig).map(([k, v]) => (
-              <SelectItem key={k} value={k}>
-                {v.label}
+            {Object.entries(statusConfig).map(([value, config]) => (
+              <SelectItem key={value} value={value}>
+                {config.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
-
       {rawItems === undefined ? (
         <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16" />
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} className="h-16" />
           ))}
         </div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <ShieldCheck className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p>No roadmap items yet</p>
+      ) : filtered.length === 0 ? (
+        <div className="py-16 text-center text-muted-foreground">
+          <ShieldCheck className="mx-auto mb-3 h-10 w-10 opacity-30" />
+          No roadmap items yet
         </div>
       ) : (
         <div className="space-y-1">
-          {filterLevel === "all"
-            ? // Tree view
-              initiatives.map((init) => (
-                <div key={init._id}>
-                  {renderItem(init, 0)}
-                  {programs
-                    .filter((p) => p.parentId === init._id)
-                    .map((prog) => (
-                      <div key={prog._id}>
-                        {renderItem(prog, 1)}
-                        {projects
-                          .filter((p) => p.parentId === prog._id)
-                          .map((proj) => (
-                            <div key={proj._id}>
-                              {renderItem(proj, 2)}
-                              {sprints
-                                .filter((s) => s.parentId === proj._id)
-                                .map((sprint) => (
-                                  <div key={sprint._id}>
-                                    {renderItem(sprint, 3)}
-                                    {workstreams
-                                      .filter((w) => w.parentId === sprint._id)
-                                      .map((ws) => renderItem(ws, 4))}
-                                  </div>
-                                ))}
-                            </div>
-                          ))}
-                      </div>
-                    ))}
-                </div>
-              ))
-            : filtered.map((item) => renderItem(item))}
+          {filtered
+            .filter(
+              (item) =>
+                !item.parentId ||
+                !filtered.some((candidate) => candidate._id === item.parentId),
+            )
+            .map((item) => renderItem(item))}
         </div>
       )}
-
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-xl bg-card border-border">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Add Roadmap Item</DialogTitle>
           </DialogHeader>
           <RoadmapForm
-            onSave={handleCreate}
-            onClose={() => setShowForm(false)}
             items={items}
             systems={systems}
+            resources={master?.resources ?? []}
+            onSave={async (data) => {
+              await createItem(data);
+              toast.success("Added");
+            }}
+            onClose={() => setShowForm(false)}
           />
         </DialogContent>
       </Dialog>
@@ -1013,37 +701,43 @@ function RoadmapContent() {
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
       >
-        <DialogContent className="max-w-xl bg-card border-border">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Edit Roadmap Item</DialogTitle>
           </DialogHeader>
           {editing && (
             <RoadmapForm
               initial={editing}
-              onSave={handleUpdate}
-              onClose={() => setEditing(null)}
               items={items}
               systems={systems}
+              resources={master?.resources ?? []}
+              onSave={async (data) => {
+                await updateItem({ id: editing._id, ...data });
+                toast.success("Updated");
+              }}
+              onClose={() => setEditing(null)}
             />
           )}
         </DialogContent>
       </Dialog>
       <Dialog open={showImport} onOpenChange={setShowImport}>
-        <DialogContent className="max-w-lg bg-card border-border">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Nhập Sprint từ Excel</DialogTitle>
           </DialogHeader>
           <ImportSprintsDialog
             items={items}
+            systems={systems}
             onClose={() => setShowImport(false)}
           />
         </DialogContent>
       </Dialog>
-      {costProject && costsByProject.get(costProject._id) && (
-        <ProjectCostDialog
-          project={costProject}
-          summary={costsByProject.get(costProject._id)!}
-          onClose={() => setCostProject(null)}
+      {taskSprint && (
+        <TaskDialog
+          projectId={projectForSprint(taskSprint)!._id}
+          sprintId={taskSprint._id}
+          resources={master?.resources ?? []}
+          onClose={() => setTaskSprint(null)}
         />
       )}
     </div>
