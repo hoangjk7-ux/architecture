@@ -55,12 +55,11 @@ export function ImportSprintsDialog({
 }) {
   const importSprints = useMutation(api.roadmap.importSprints);
   const roadmapProjects = items.filter((item) => item.level === "project");
-  const projects = systems.flatMap((system) => {
-    const project = roadmapProjects.find((item) =>
-      item.relatedSystemIds.includes(system._id),
-    );
-    return project ? [{ id: project._id, name: system.name }] : [];
-  });
+  const systemById = new Map(systems.map((system) => [system._id, system]));
+  const projects = roadmapProjects.map((project) => ({
+    id: project._id,
+    name: systemById.get(project.relatedSystemIds[0])?.name ?? project.title,
+  }));
   const [projectId, setProjectId] = useState<Id<"roadmap_items"> | "">("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [parsed, setParsed] = useState<SprintImport[] | null>(null);
@@ -118,8 +117,8 @@ export function ImportSprintsDialog({
         <Label>Project đích</Label>
         {projects.length === 0 ? (
           <p className="text-xs text-yellow-400">
-            Chưa có roadmap item cấp "project" nào — hãy tạo một project trước
-            khi nhập sprint.
+            Chưa có dự án trong Roadmap — hãy tạo một project trước khi nhập
+            sprint.
           </p>
         ) : (
           <Select
@@ -129,7 +128,7 @@ export function ImportSprintsDialog({
             <SelectTrigger className="bg-input">
               <SelectValue placeholder="Chọn project" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-[320px]">
               {projects.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.name}

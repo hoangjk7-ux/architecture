@@ -258,9 +258,13 @@ function RoadmapForm({
                   placeholder={`Chọn ${levelLabels[parentLevelOf[form.level]!]}`}
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[320px]">
                 {parentCandidates.map((item) => (
-                  <SelectItem key={item._id} value={item._id}>
+                  <SelectItem
+                    key={item._id}
+                    value={item._id}
+                    className="whitespace-normal"
+                  >
                     {item.title}
                   </SelectItem>
                 ))}
