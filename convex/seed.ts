@@ -78,7 +78,7 @@ export const seedData = internalMutation({
 
     // ── 2. Software Systems ──────────────────────────────────────────────────
     const erpId = await ctx.db.insert("software_systems", {
-      name: "SAP S/4HANA",
+      name: "POS",
       type: "core",
       category: "ERP",
       status: "active",
@@ -102,7 +102,7 @@ export const seedData = internalMutation({
     });
 
     const crmId = await ctx.db.insert("software_systems", {
-      name: "Salesforce Sales Cloud",
+      name: "CRM",
       type: "core",
       category: "CRM",
       status: "active",
@@ -126,7 +126,7 @@ export const seedData = internalMutation({
     });
 
     const hrmsId = await ctx.db.insert("software_systems", {
-      name: "SAP SuccessFactors",
+      name: "Kế toán",
       type: "supporting",
       category: "HRM",
       status: "active",
@@ -150,7 +150,7 @@ export const seedData = internalMutation({
     });
 
     const itsmId = await ctx.db.insert("software_systems", {
-      name: "ServiceNow ITSM",
+      name: "Kho",
       type: "supporting",
       category: "ITSM",
       status: "active",
@@ -174,7 +174,7 @@ export const seedData = internalMutation({
     });
 
     const oracleEbsId = await ctx.db.insert("software_systems", {
-      name: "Oracle E-Business Suite",
+      name: "Điều vận",
       type: "legacy",
       category: "ERP",
       status: "sunset",
@@ -198,7 +198,7 @@ export const seedData = internalMutation({
     });
 
     const biId = await ctx.db.insert("software_systems", {
-      name: "Microsoft Power BI",
+      name: "SIS",
       type: "supporting",
       category: "BI",
       status: "active",
@@ -222,7 +222,7 @@ export const seedData = internalMutation({
     });
 
     const m365Id = await ctx.db.insert("software_systems", {
-      name: "Microsoft 365",
+      name: "LMS",
       type: "supporting",
       category: "Collaboration",
       status: "active",
@@ -246,7 +246,7 @@ export const seedData = internalMutation({
     });
 
     const apiGatewayId = await ctx.db.insert("software_systems", {
-      name: "API Gateway (Internal)",
+      name: "Middleware",
       type: "supporting",
       category: "Integration",
       status: "active",
@@ -268,7 +268,7 @@ export const seedData = internalMutation({
     });
 
     const dataWarehouseId = await ctx.db.insert("software_systems", {
-      name: "Snowflake Data Warehouse",
+      name: "Biểu phí",
       type: "supporting",
       category: "Data Platform",
       status: "active",
@@ -292,7 +292,7 @@ export const seedData = internalMutation({
     });
 
     const customerPortalId = await ctx.db.insert("software_systems", {
-      name: "Customer Self-Service Portal",
+      name: "Ecommerce",
       type: "pilot",
       category: "Customer Portal",
       status: "pilot",
@@ -723,7 +723,7 @@ export const seedData = internalMutation({
 
     // Projects under Program 1a
     const proj1a1Id = await ctx.db.insert("roadmap_items", {
-      title: "Oracle EBS Decommission – Campus B",
+      title: "Điều vận",
       level: "project",
       parentId: prog1aId,
       status: "in_progress",
@@ -731,14 +731,14 @@ export const seedData = internalMutation({
       startDate: "2025-04-01",
       dueDate: "2025-09-30",
       architectureAlignmentScore: 95,
-      relatedSystemIds: [oracleEbsId, erpId],
+      relatedSystemIds: [oracleEbsId],
       priority: "high",
       description:
         "Final data migration from Oracle EBS to SAP S/4HANA, user acceptance testing, and system shutdown on Campus B.",
     });
 
     const proj1a2Id = await ctx.db.insert("roadmap_items", {
-      title: "SAP S/4HANA SD Module Optimization",
+      title: "POS",
       level: "project",
       parentId: prog1aId,
       status: "in_progress",
@@ -753,7 +753,7 @@ export const seedData = internalMutation({
     });
 
     await ctx.db.insert("roadmap_items", {
-      title: "SAP Embedded Analytics Rollout",
+      title: "LMS",
       level: "project",
       parentId: prog1aId,
       status: "not_started",
@@ -761,7 +761,7 @@ export const seedData = internalMutation({
       startDate: "2025-09-01",
       dueDate: "2026-03-31",
       architectureAlignmentScore: 82,
-      relatedSystemIds: [erpId, dataWarehouseId],
+      relatedSystemIds: [m365Id],
       priority: "medium",
       description:
         "Deploy S/4HANA embedded analytics for Finance and Operations, reducing dependency on external reporting tools.",
@@ -769,7 +769,7 @@ export const seedData = internalMutation({
 
     // Projects under Program 1b
     const proj1b1Id = await ctx.db.insert("roadmap_items", {
-      title: "API Gateway Production Hardening",
+      title: "Middleware",
       level: "project",
       parentId: prog1bId,
       status: "in_progress",
@@ -784,7 +784,7 @@ export const seedData = internalMutation({
     });
 
     await ctx.db.insert("roadmap_items", {
-      title: "Point-to-Point Integration Elimination",
+      title: "Kho",
       level: "project",
       parentId: prog1bId,
       status: "not_started",
@@ -792,7 +792,7 @@ export const seedData = internalMutation({
       startDate: "2025-08-01",
       dueDate: "2026-03-31",
       architectureAlignmentScore: 76,
-      relatedSystemIds: [apiGatewayId, erpId, crmId, hrmsId, itsmId],
+      relatedSystemIds: [itsmId],
       priority: "medium",
       description:
         "Migrate remaining direct DB-link and ETL integrations to go through the central API gateway.",
@@ -800,7 +800,7 @@ export const seedData = internalMutation({
 
     // Projects under Program 2a
     await ctx.db.insert("roadmap_items", {
-      title: "Snowflake Data Warehouse Migration",
+      title: "Biểu phí",
       level: "project",
       parentId: prog2aId,
       status: "done",
@@ -808,14 +808,14 @@ export const seedData = internalMutation({
       startDate: "2025-03-01",
       dueDate: "2025-05-31",
       architectureAlignmentScore: 90,
-      relatedSystemIds: [dataWarehouseId, erpId, crmId],
+      relatedSystemIds: [dataWarehouseId],
       priority: "high",
       description:
         "Complete migration of legacy SQL Server DW to Snowflake and validate all ELT pipelines.",
     });
 
     await ctx.db.insert("roadmap_items", {
-      title: "Power BI Self-Service Analytics Rollout",
+      title: "SIS",
       level: "project",
       parentId: prog2aId,
       status: "in_progress",
@@ -823,14 +823,14 @@ export const seedData = internalMutation({
       startDate: "2025-06-01",
       dueDate: "2025-11-30",
       architectureAlignmentScore: 85,
-      relatedSystemIds: [biId, dataWarehouseId],
+      relatedSystemIds: [biId],
       priority: "medium",
       description:
         "Deploy Power BI premium capacity, establish data governance policies, and train 200+ business users.",
     });
 
     await ctx.db.insert("roadmap_items", {
-      title: "HR Analytics Dashboard",
+      title: "Kế toán",
       level: "project",
       parentId: prog2aId,
       status: "not_started",
@@ -838,7 +838,7 @@ export const seedData = internalMutation({
       startDate: "2025-09-01",
       dueDate: "2025-12-31",
       architectureAlignmentScore: 83,
-      relatedSystemIds: [biId, hrmsId, dataWarehouseId],
+      relatedSystemIds: [hrmsId],
       priority: "medium",
       description:
         "Build HR analytics dashboards covering headcount, attrition, and learning metrics in Power BI.",
@@ -846,7 +846,7 @@ export const seedData = internalMutation({
 
     // Projects under Program 3a
     await ctx.db.insert("roadmap_items", {
-      title: "Einstein AI Lead Scoring Implementation",
+      title: "CRM",
       level: "project",
       parentId: prog3aId,
       status: "not_started",
@@ -854,14 +854,14 @@ export const seedData = internalMutation({
       startDate: "2025-10-01",
       dueDate: "2026-03-31",
       architectureAlignmentScore: 72,
-      relatedSystemIds: [crmId, dataWarehouseId],
+      relatedSystemIds: [crmId],
       priority: "medium",
       description:
         "Configure and train Salesforce Einstein AI lead scoring model using 3 years of historical win/loss data.",
     });
 
     const proj3a2Id = await ctx.db.insert("roadmap_items", {
-      title: "Customer Self-Service Portal – Phase 2",
+      title: "Ecommerce",
       level: "project",
       parentId: prog3aId,
       status: "not_started",
@@ -869,7 +869,7 @@ export const seedData = internalMutation({
       startDate: "2025-08-01",
       dueDate: "2026-06-30",
       architectureAlignmentScore: 70,
-      relatedSystemIds: [customerPortalId, crmId, apiGatewayId],
+      relatedSystemIds: [customerPortalId],
       priority: "medium",
       description:
         "Expand pilot portal to full production: order tracking, returns management, and live chat support.",
@@ -952,7 +952,7 @@ export const seedData = internalMutation({
     });
 
     await ctx.db.insert("roadmap_items", {
-      title: "ITSM CMDB Data Quality Remediation",
+      title: "Kho",
       level: "project",
       status: "blocked",
       owner: "Hoang Kim Lan",

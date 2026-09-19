@@ -140,10 +140,13 @@ export const list = query({
   },
 });
 
-async function normalizeProjectSystem(
-  ctx: Parameters<typeof requireWriteAccess>[0],
-  data: ReturnType<typeof normalizeRoadmapItem>,
-) {
+async function normalizeProjectSystem<
+  T extends {
+    level: RoadmapLevel;
+    title: string;
+    relatedSystemIds: Id<"software_systems">[];
+  },
+>(ctx: Parameters<typeof requireWriteAccess>[0], data: T): Promise<T> {
   if (data.level !== "project") return data;
   if (data.relatedSystemIds.length !== 1)
     domainError(
