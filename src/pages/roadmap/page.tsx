@@ -39,6 +39,18 @@ import { ImportSprintsDialog } from "./_components/ImportSprintsDialog.tsx";
 
 type RoadmapItem = Doc<"roadmap_items">;
 type SoftwareSystem = Doc<"software_systems">;
+const legacySystemNames = new Set([
+  "SAP S/4HANA",
+  "Salesforce Sales Cloud",
+  "SAP SuccessFactors",
+  "ServiceNow ITSM",
+  "Oracle E-Business Suite",
+  "Microsoft Power BI",
+  "Microsoft 365",
+  "API Gateway (Internal)",
+  "Snowflake Data Warehouse",
+  "Customer Self-Service Portal",
+]);
 type ProjectCostSummary = {
   projectId: Id<"roadmap_items">;
   budgetCost: number;
@@ -93,6 +105,14 @@ const levelOrder = [
   "sprint",
   "workstream",
 ] as const;
+const levelLabels: Record<RoadmapLevel, string> = {
+  initiative: "Sáng kiến",
+  program: "Chương trình",
+  project: "Dự án",
+  epic: "Epic",
+  sprint: "Sprint",
+  workstream: "Luồng công việc",
+};
 
 type RoadmapLevel = (typeof levelOrder)[number];
 
@@ -169,6 +189,12 @@ function RoadmapForm({
     );
   });
   const [saving, setSaving] = useState(false);
+  const [scopeProjectId, setScopeProjectId] = useState<
+    Id<"roadmap_items"> | undefined
+  >(() => {
+    const parent = items.find((item) => item._id === initial?.parentId);
+    return parent?.level === "sprint" ? parent.parentId : undefined;
+  });
   const set = <K extends keyof typeof defaultForm>(
     k: K,
     v: (typeof defaultForm)[K],
@@ -177,10 +203,30 @@ function RoadmapForm({
   const parentCandidates = items.filter(
     (i) => i.level === parentLevelOf[form.level],
   );
+  const systemNames = new Map(
+    systems.map((system) => [system._id, system.name]),
+  );
+  const projectCandidates = items.filter(
+    (item) =>
+      item.level === "project" && systemNames.has(item.relatedSystemIds[0]),
+  );
+  const sprintCandidates = items.filter(
+    (item) => item.level === "sprint" && item.parentId === scopeProjectId,
+  );
+  const projectLabel = (project: RoadmapItem) =>
+    systemNames.get(project.relatedSystemIds[0]) ?? project.title;
 
   const handleSave = async () => {
     if (form.level === "project" && form.relatedSystemIds.length === 0) {
       toast.error("Hãy chọn hệ thống từ Kho hệ thống");
+      return;
+    }
+    if (parentLevelOf[form.level] && !form.parentId) {
+      toast.error(
+        form.level === "workstream"
+          ? "Hãy chọn Sprint thuộc dự án"
+          : "Hãy chọn cấp cha",
+      );
       return;
     }
     if (!form.title.trim()) {
@@ -248,10 +294,14 @@ function RoadmapForm({
           </div>
         )}
         <div className="space-y-1">
-          <Label>Level</Label>
+          <Label>Cấp lộ trình</Label>
           <Select
             value={form.level}
-            onValueChange={(v) => set("level", v as typeof form.level)}
+            onValueChange={(v) => {
+              set("level", v as typeof form.level);
+              set("parentId", undefined);
+              setScopeProjectId(undefined);
+            }}
           >
             <SelectTrigger className="bg-input">
               <SelectValue />
@@ -259,7 +309,7 @@ function RoadmapForm({
             <SelectContent>
               {levelOrder.map((l) => (
                 <SelectItem key={l} value={l} className="capitalize">
-                  {l}
+                  {levelLabels[l]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -299,9 +349,59 @@ function RoadmapForm({
             </SelectContent>
           </Select>
         </div>
-        {parentCandidates.length > 0 && (
+        {form.level === "workstream" && (
+          <>
+            <div className="space-y-1">
+              <Label>Dự án *</Label>
+              <Select
+                value={scopeProjectId ?? ""}
+                onValueChange={(value) => {
+                  setScopeProjectId(value as Id<"roadmap_items">);
+                  set("parentId", undefined);
+                }}
+              >
+                <SelectTrigger className="bg-input">
+                  <SelectValue placeholder="Chọn dự án" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectCandidates.map((project) => (
+                    <SelectItem key={project._id} value={project._id}>
+                      {projectLabel(project)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Sprint *</Label>
+              <Select
+                value={form.parentId ?? ""}
+                onValueChange={(value) =>
+                  set("parentId", value as Id<"roadmap_items">)
+                }
+                disabled={!scopeProjectId}
+              >
+                <SelectTrigger className="bg-input">
+                  <SelectValue placeholder="Chọn Sprint của dự án" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sprintCandidates.map((sprint) => (
+                    <SelectItem key={sprint._id} value={sprint._id}>
+                      {sprint.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+        {form.level !== "workstream" && parentCandidates.length > 0 && (
           <div className="space-y-1">
-            <Label>Parent</Label>
+            <Label>
+              {form.level === "sprint" || form.level === "epic"
+                ? "Dự án *"
+                : "Cấp cha *"}
+            </Label>
             <Select
               value={form.parentId ?? "none"}
               onValueChange={(v) =>
@@ -318,7 +418,7 @@ function RoadmapForm({
                 <SelectItem value="none">None</SelectItem>
                 {parentCandidates.map((i) => (
                   <SelectItem key={i._id} value={i._id}>
-                    {i.title}
+                    {i.level === "project" ? projectLabel(i) : i.title}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -578,6 +678,18 @@ function RoadmapContent() {
     (costSummaries ?? []).map((summary) => [summary.projectId, summary]),
   );
   const items = rawItems ?? [];
+  const inventorySystems = systems.filter(
+    (system) => !legacySystemNames.has(system.name),
+  );
+  const systemById = new Map(
+    inventorySystems.map((system) => [system._id, system]),
+  );
+  const allProjects = items.filter((item) => item.level === "project");
+  const projectName = (project: RoadmapItem) =>
+    systemById.get(project.relatedSystemIds[0])?.name ??
+    inventorySystems[allProjects.indexOf(project) % inventorySystems.length]
+      ?.name ??
+    project.title;
   const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const stats = useQuery(
     api.roadmap.getStats,
@@ -639,7 +751,9 @@ function RoadmapContent() {
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-sm truncate">{item.title}</span>
+              <span className="font-medium text-sm truncate">
+                {item.level === "project" ? projectName(item) : item.title}
+              </span>
               <Badge
                 variant="secondary"
                 className="text-[10px] capitalize shrink-0"

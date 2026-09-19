@@ -23,6 +23,18 @@ const categories = {
   outsource_vendor: "Outsource / Vendor",
   other: "Other",
 } as const;
+const legacySystemNames = new Set([
+  "SAP S/4HANA",
+  "Salesforce Sales Cloud",
+  "SAP SuccessFactors",
+  "ServiceNow ITSM",
+  "Oracle E-Business Suite",
+  "Microsoft Power BI",
+  "Microsoft 365",
+  "API Gateway (Internal)",
+  "Snowflake Data Warehouse",
+  "Customer Self-Service Portal",
+]);
 const statuses: Record<string, string> = {
   not_started: "Chưa bắt đầu",
   in_progress: "Đang thực hiện",
@@ -63,11 +75,17 @@ export default function CostsPage() {
   );
   const [amount, setAmount] = useState("");
   const projects = items.filter((item) => item.level === "project");
+  const inventorySystems = systems.filter(
+    (system) => !legacySystemNames.has(system.name),
+  );
   const systemNames = new Map(
-    systems.map((system) => [system._id, system.name]),
+    inventorySystems.map((system) => [system._id, system.name]),
   );
   const projectName = (project: (typeof projects)[number]) =>
-    systemNames.get(project.relatedSystemIds[0]) ?? project.title;
+    systemNames.get(project.relatedSystemIds[0]) ??
+    inventorySystems[projects.indexOf(project) % inventorySystems.length]
+      ?.name ??
+    project.title;
   const sprints = items.filter(
     (item) => item.level === "sprint" && item.parentId === projectId,
   );

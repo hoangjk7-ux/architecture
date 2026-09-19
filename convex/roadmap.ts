@@ -57,6 +57,17 @@ async function validateParent(
   const parent = await ctx.db.get(parentId);
   if (!parent) domainError("NOT_FOUND", "Roadmap parent not found", "parentId");
   assertRoadmapParent(level, parent.level);
+  if (level === "sprint" || level === "epic") {
+    if (
+      parent.relatedSystemIds.length !== 1 ||
+      !(await ctx.db.get(parent.relatedSystemIds[0]))
+    )
+      domainError(
+        "VALIDATION_ERROR",
+        "Parent project must reference Kho hệ thống",
+        "parentId",
+      );
+  }
 
   const ancestorIds: string[] = [parentId];
   let ancestor = parent;
