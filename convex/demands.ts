@@ -1,6 +1,10 @@
 import { mutation, query } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireAuthenticated, requireRole } from "./helpers";
+import {
+  requireAuthenticated,
+  requireReadAccess,
+  requireRole,
+} from "./helpers";
 import {
   assertDemandTransition,
   notifyRoles,
@@ -47,7 +51,7 @@ function score(values: {
 export const list = query({
   args: { status: v.optional(statusValidator) },
   handler: async (ctx, args) => {
-    const user = await requireAuthenticated(ctx);
+    const user = await requireReadAccess(ctx);
     const all = args.status
       ? await ctx.db
           .query("demands")
