@@ -249,6 +249,51 @@ export default defineSchema({
     .index("by_level", ["level"])
     .index("by_parent", ["parentId"]),
 
+  project_role_rates: defineTable({
+    name: v.string(),
+    hourlyRate: v.number(),
+  }).index("by_name", ["name"]),
+
+  project_resources: defineTable({
+    name: v.string(),
+    email: v.optional(v.string()),
+    roleRateId: v.id("project_role_rates"),
+    active: v.boolean(),
+  }).index("by_role", ["roleRateId"]),
+
+  project_tasks: defineTable({
+    projectId: v.id("roadmap_items"),
+    sprintId: v.id("roadmap_items"),
+    title: v.string(),
+    assigneeId: v.id("project_resources"),
+    phase: v.union(v.literal("pre_uat"), v.literal("post_uat")),
+    estimatedHours: v.number(),
+    actualHours: v.number(),
+    remainingHours: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_sprint", ["sprintId"])
+    .index("by_assignee", ["assigneeId"]),
+
+  project_non_labor_costs: defineTable({
+    projectId: v.id("roadmap_items"),
+    category: v.union(
+      v.literal("server"),
+      v.literal("domain"),
+      v.literal("license"),
+      v.literal("software"),
+      v.literal("outsource"),
+      v.literal("other"),
+    ),
+    costType: v.union(
+      v.literal("initial"),
+      v.literal("monthly"),
+      v.literal("annual"),
+    ),
+    amount: v.number(),
+    description: v.optional(v.string()),
+  }).index("by_project", ["projectId"]),
+
   departments: defineTable({
     name: v.string(),
     code: v.string(),

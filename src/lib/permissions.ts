@@ -31,8 +31,15 @@ export const routeRoles = {
   vendors: ["cto", "it_manager", "business_owner", "viewer"],
   architecture: ["cto", "it_manager", "business_owner", "viewer"],
   integrations: ["cto", "it_manager", "viewer"],
-  roadmap: ["cto", "it_manager", "business_owner", "viewer"],
+  roadmap: allRoles,
   demands: allRoles,
   users: ["cto"],
   settings: ["cto", "it_manager"],
 } as const satisfies Record<string, readonly UserRole[]>;
+
+export const projectCostRoles: readonly UserRole[] = [
+  "cto",
+  "it_manager",
+  "resource_manager",
+  "finance_manager",
+];

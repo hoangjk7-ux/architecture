@@ -6,6 +6,7 @@ import {
 } from "react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
+import { projectCostRoles } from "@/lib/permissions.ts";
 
 function useCurrentUserValue() {
   const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
@@ -24,6 +25,9 @@ function useCurrentUserValue() {
     isBusinessOwner: user?.role === "business_owner",
     isViewer: user?.role === "viewer",
     canWrite: user?.role === "cto" || user?.role === "it_manager",
+    canViewProjectCosts: user?.role
+      ? projectCostRoles.includes(user.role)
+      : false,
   };
 }
 

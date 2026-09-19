@@ -28,14 +28,43 @@ import {
   Trash2,
   ChevronRight,
   FileSpreadsheet,
+  CircleDollarSign,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user.ts";
 import { cn } from "@/lib/utils.ts";
+import { formatVnd } from "@/lib/format.ts";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { ImportSprintsDialog } from "./_components/ImportSprintsDialog.tsx";
 
 type RoadmapItem = Doc<"roadmap_items">;
+type SoftwareSystem = Doc<"software_systems">;
+type ProjectCostSummary = {
+  projectId: Id<"roadmap_items">;
+  budgetCost: number;
+  forecastCost: number;
+  actualCost: number;
+  remainingCost: number;
+  usedPercent: number;
+  internalPreUat: number;
+  internalPostUat: number;
+  internalResourceCost: number;
+  initialCost: number;
+  monthlyCost: number;
+  annualCost: number;
+  year1Cost: number;
+  year2AnnualRunRate: number;
+  nonLaborCosts: Doc<"project_non_labor_costs">[];
+};
+
+const costCategories = {
+  server: "Server",
+  domain: "Domain",
+  license: "License",
+  software: "Software",
+  outsource: "Outsource",
+  other: "Other",
+} as const;
 
 const statusConfig = {
   not_started: {
@@ -122,11 +151,13 @@ function RoadmapForm({
   onSave,
   onClose,
   items,
+  systems,
 }: {
   initial?: Partial<RoadmapFormData> & { _id?: Id<"roadmap_items"> };
   onSave: (data: RoadmapFormData) => Promise<void>;
   onClose: () => void;
   items: RoadmapItem[];
+  systems: SoftwareSystem[];
 }) {
   const [form, setForm] = useState<RoadmapFormData>(() => {
     const src = (initial ?? {}) as Record<string, unknown>;
@@ -149,6 +180,10 @@ function RoadmapForm({
   );
 
   const handleSave = async () => {
+    if (form.level === "project" && form.relatedSystemIds.length === 0) {
+      toast.error("Hãy chọn hệ thống từ Kho hệ thống");
+      return;
+    }
     if (!form.title.trim()) {
       toast.error("Title is required");
       return;
@@ -170,15 +205,49 @@ function RoadmapForm({
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2 space-y-1">
-          <Label>Title *</Label>
-          <Input
-            value={form.title}
-            onChange={(e) => set("title", e.target.value)}
-            placeholder="e.g. Digital Campus Initiative"
-            className="bg-input"
-          />
-        </div>
+        {form.level === "project" ? (
+          <div className="col-span-2 space-y-1">
+            <Label>Hệ thống *</Label>
+            <Select
+              value={form.relatedSystemIds[0] ?? ""}
+              onValueChange={(value) => {
+                const system = systems.find((item) => item._id === value);
+                if (!system) return;
+                setForm((current) => ({
+                  ...current,
+                  title: system.name,
+                  relatedSystemIds: [system._id],
+                }));
+              }}
+            >
+              <SelectTrigger className="bg-input">
+                <SelectValue placeholder="Chọn từ Kho hệ thống" />
+              </SelectTrigger>
+              <SelectContent>
+                {systems.map((system) => (
+                  <SelectItem key={system._id} value={system._id}>
+                    {system.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {systems.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Chưa có dữ liệu trong Kho hệ thống.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="col-span-2 space-y-1">
+            <Label>Title *</Label>
+            <Input
+              value={form.title}
+              onChange={(e) => set("title", e.target.value)}
+              placeholder="e.g. Digital Campus Initiative"
+              className="bg-input"
+            />
+          </div>
+        )}
         <div className="space-y-1">
           <Label>Level</Label>
           <Select
@@ -320,9 +389,195 @@ function RoadmapForm({
   );
 }
 
+function ProjectCostDialog({
+  project,
+  summary,
+  onClose,
+}: {
+  project: RoadmapItem;
+  summary: ProjectCostSummary;
+  onClose: () => void;
+}) {
+  const createCost = useMutation(api.roadmap.createProjectNonLaborCost);
+  const removeCost = useMutation(api.roadmap.removeProjectNonLaborCost);
+  const [category, setCategory] =
+    useState<keyof typeof costCategories>("server");
+  const [costType, setCostType] = useState<"initial" | "monthly" | "annual">(
+    "initial",
+  );
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const addCost = async () => {
+    if (!amount || Number(amount) < 0) return;
+    setSaving(true);
+    try {
+      await createCost({
+        projectId: project._id,
+        category,
+        costType,
+        amount: Number(amount),
+        description: description || undefined,
+      });
+      setAmount("");
+      setDescription("");
+      toast.success("Đã thêm chi phí");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const metrics = [
+    ["Budget", summary.budgetCost],
+    ["Forecast", summary.forecastCost],
+    ["Actual", summary.actualCost],
+    ["Remaining", summary.remainingCost],
+  ] as const;
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-4xl bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>Chi phí dự án · {project.title}</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[75vh] space-y-4 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {metrics.map(([label, value]) => (
+              <div key={label} className="rounded-lg border p-3">
+                <div className="text-xs text-muted-foreground">{label}</div>
+                <div className="mt-1 font-semibold">{formatVnd(value)}</div>
+              </div>
+            ))}
+            <div className="rounded-lg border p-3">
+              <div className="text-xs text-muted-foreground">Used</div>
+              <div className="mt-1 font-semibold">{summary.usedPercent}%</div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-lg bg-muted/30 p-3 text-sm">
+              Pre-UAT
+              <br />
+              <strong>{formatVnd(summary.internalPreUat)}</strong>
+            </div>
+            <div className="rounded-lg bg-muted/30 p-3 text-sm">
+              Post-UAT
+              <br />
+              <strong>{formatVnd(summary.internalPostUat)}</strong>
+            </div>
+            <div className="rounded-lg bg-muted/30 p-3 text-sm">
+              Tổng Năm 1<br />
+              <strong>{formatVnd(summary.year1Cost)}</strong>
+            </div>
+            <div className="rounded-lg bg-muted/30 p-3 text-sm">
+              Duy trì từ Năm 2<br />
+              <strong>{formatVnd(summary.year2AnnualRunRate)}</strong>
+            </div>
+          </div>
+
+          <div className="rounded-lg border">
+            <div className="border-b px-4 py-3 text-sm font-semibold">
+              Chi phí khác
+            </div>
+            <div className="divide-y">
+              {summary.nonLaborCosts.length === 0 && (
+                <div className="p-4 text-sm text-muted-foreground">
+                  Chưa có chi phí khác.
+                </div>
+              )}
+              {summary.nonLaborCosts.map((cost) => (
+                <div
+                  key={cost._id}
+                  className="flex items-center gap-3 px-4 py-2"
+                >
+                  <span className="w-24 text-sm">
+                    {costCategories[cost.category]}
+                  </span>
+                  <Badge variant="secondary" className="capitalize">
+                    {cost.costType}
+                  </Badge>
+                  <span className="flex-1 truncate text-xs text-muted-foreground">
+                    {cost.description}
+                  </span>
+                  <strong className="text-sm">{formatVnd(cost.amount)}</strong>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive"
+                    onClick={() => void removeCost({ id: cost._id })}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_1fr_1fr_1.5fr_auto]">
+            <Select
+              value={category}
+              onValueChange={(v) =>
+                setCategory(v as keyof typeof costCategories)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(costCategories).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={costType}
+              onValueChange={(v) => setCostType(v as typeof costType)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="initial">Initial</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="annual">Annual</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              min={0}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Số tiền"
+            />
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Mô tả"
+            />
+            <Button disabled={saving || !amount} onClick={() => void addCost()}>
+              Thêm
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function RoadmapContent() {
-  const { canWrite } = useCurrentUser();
+  const { canWrite, canViewProjectCosts } = useCurrentUser();
   const rawItems = useQuery(api.roadmap.list);
+  const systems = useQuery(api.software_systems.list) ?? [];
+  const costSummaries = useQuery(
+    api.roadmap.listProjectCostSummaries,
+    canViewProjectCosts ? {} : "skip",
+  );
+  const costsByProject = new Map(
+    (costSummaries ?? []).map((summary) => [summary.projectId, summary]),
+  );
   const items = rawItems ?? [];
   const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
   const stats = useQuery(
@@ -336,6 +591,7 @@ function RoadmapContent() {
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editing, setEditing] = useState<RoadmapItem | null>(null);
+  const [costProject, setCostProject] = useState<RoadmapItem | null>(null);
   const [filterLevel, setFilterLevel] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -367,6 +623,7 @@ function RoadmapContent() {
 
   const renderItem = (item: RoadmapItem, indent = 0) => {
     const cfg = statusConfig[item.status];
+    const projectCost = costsByProject.get(item._id);
     const isOverdue =
       item.dueDate && item.dueDate < today && item.status !== "done";
     return (
@@ -425,30 +682,53 @@ function RoadmapContent() {
                   {item.architectureAlignmentScore}%
                 </span>
               </span>
+              {item.level === "project" && projectCost && (
+                <>
+                  <span>Năm 1: {formatVnd(projectCost.year1Cost)}</span>
+                  <span>
+                    Duy trì/năm: {formatVnd(projectCost.year2AnnualRunRate)}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
-        {canWrite && (
+        {(canWrite || (canViewProjectCosts && item.level === "project")) && (
           <div className="flex items-center gap-1 shrink-0 ml-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 cursor-pointer"
-              onClick={() => setEditing(item)}
-            >
-              <Edit className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 cursor-pointer text-destructive hover:text-destructive"
-              onClick={() => {
-                removeItem({ id: item._id });
-                toast.success("Removed");
-              }}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
+            {canViewProjectCosts && item.level === "project" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Quản lý chi phí"
+                className="h-7 w-7 cursor-pointer text-emerald-400"
+                onClick={() => setCostProject(item)}
+              >
+                <CircleDollarSign className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {canWrite && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer"
+                  onClick={() => setEditing(item)}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 cursor-pointer text-destructive hover:text-destructive"
+                  onClick={() => {
+                    removeItem({ id: item._id });
+                    toast.success("Removed");
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -610,6 +890,7 @@ function RoadmapContent() {
             onSave={handleCreate}
             onClose={() => setShowForm(false)}
             items={items}
+            systems={systems}
           />
         </DialogContent>
       </Dialog>
@@ -627,6 +908,7 @@ function RoadmapContent() {
               onSave={handleUpdate}
               onClose={() => setEditing(null)}
               items={items}
+              systems={systems}
             />
           )}
         </DialogContent>
@@ -642,6 +924,13 @@ function RoadmapContent() {
           />
         </DialogContent>
       </Dialog>
+      {costProject && costsByProject.get(costProject._id) && (
+        <ProjectCostDialog
+          project={costProject}
+          summary={costsByProject.get(costProject._id)!}
+          onClose={() => setCostProject(null)}
+        />
+      )}
     </div>
   );
 }

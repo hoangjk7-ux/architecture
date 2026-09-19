@@ -83,6 +83,17 @@ export async function requireReadAccess(ctx: QueryCtx | MutationCtx) {
   ]);
 }
 
+export const PROJECT_COST_ROLES: UserRole[] = [
+  "cto",
+  "it_manager",
+  "resource_manager",
+  "finance_manager",
+];
+
+export async function requireProjectCostAccess(ctx: QueryCtx | MutationCtx) {
+  return requireRole(ctx, PROJECT_COST_ROLES);
+}
+
 export async function requireCTO(ctx: QueryCtx | MutationCtx) {
   return requireRole(ctx, ["cto"]);
 }

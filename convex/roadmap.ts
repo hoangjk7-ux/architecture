@@ -1,8 +1,19 @@
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import { requireReadAccess, requireWriteAccess } from "./helpers.ts";
-import { domainError } from "./domain/common.ts";
+import {
+  requireProjectCostAccess,
+  requireReadAccess,
+  requireWriteAccess,
+} from "./helpers.ts";
+import {
+  domainError,
+  numberInRange,
+  optionalText,
+  requiredText,
+} from "./domain/common.ts";
+import { calculateProjectCost } from "./domain/projectCosts.ts";
 import {
   assertNoRoadmapCycle,
   assertRoadmapParent,
@@ -281,5 +292,182 @@ export const getStats = query({
           )
         : 0,
     };
+  },
+});
+
+async function requireProject(
+  ctx: MutationCtx,
+  projectId: Id<"roadmap_items">,
+) {
+  const project = await ctx.db.get(projectId);
+  if (!project || project.level !== "project")
+    domainError("NOT_FOUND", "Project roadmap item not found", "projectId");
+  return project;
+}
+
+export const listProjectCostSummaries = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireProjectCostAccess(ctx);
+    const [items, tasks, resources, rates, nonLaborCosts] = await Promise.all([
+      ctx.db.query("roadmap_items").collect(),
+      ctx.db.query("project_tasks").collect(),
+      ctx.db.query("project_resources").collect(),
+      ctx.db.query("project_role_rates").collect(),
+      ctx.db.query("project_non_labor_costs").collect(),
+    ]);
+    const resourcesById = new Map(resources.map((item) => [item._id, item]));
+    const ratesById = new Map(rates.map((item) => [item._id, item]));
+    return items
+      .filter((item) => item.level === "project")
+      .map((project) => ({
+        projectId: project._id,
+        tasks: tasks
+          .filter((task) => task.projectId === project._id)
+          .map((task) => {
+            const resource = resourcesById.get(task.assigneeId);
+            const unitRate = resource
+              ? (ratesById.get(resource.roleRateId)?.hourlyRate ?? 0)
+              : 0;
+            return {
+              ...task,
+              assigneeName: resource?.name ?? "Unknown",
+              unitRate,
+              budgetCost: task.estimatedHours * unitRate,
+              actualCost: task.actualHours * unitRate,
+              remainingCost: task.remainingHours * unitRate,
+              forecastCost: (task.actualHours + task.remainingHours) * unitRate,
+            };
+          }),
+        nonLaborCosts: nonLaborCosts.filter(
+          (cost) => cost.projectId === project._id,
+        ),
+        ...calculateProjectCost(
+          tasks
+            .filter((task) => task.projectId === project._id)
+            .map((task) => {
+              const resource = resourcesById.get(task.assigneeId);
+              return {
+                ...task,
+                unitRate: resource
+                  ? (ratesById.get(resource.roleRateId)?.hourlyRate ?? 0)
+                  : 0,
+              };
+            }),
+          nonLaborCosts.filter((cost) => cost.projectId === project._id),
+        ),
+      }));
+  },
+});
+
+export const createProjectRoleRate = mutation({
+  args: { name: v.string(), hourlyRate: v.number() },
+  handler: async (ctx, args) => {
+    await requireProjectCostAccess(ctx);
+    const name = requiredText(args.name, "name");
+    numberInRange(args.hourlyRate, 0, Number.MAX_SAFE_INTEGER, "hourlyRate");
+    return await ctx.db.insert("project_role_rates", {
+      name,
+      hourlyRate: args.hourlyRate,
+    });
+  },
+});
+
+export const createProjectResource = mutation({
+  args: {
+    name: v.string(),
+    email: v.optional(v.string()),
+    roleRateId: v.id("project_role_rates"),
+  },
+  handler: async (ctx, args) => {
+    await requireProjectCostAccess(ctx);
+    if (!(await ctx.db.get(args.roleRateId)))
+      domainError("NOT_FOUND", "Role rate not found", "roleRateId");
+    return await ctx.db.insert("project_resources", {
+      name: requiredText(args.name, "name"),
+      email: optionalText(args.email),
+      roleRateId: args.roleRateId,
+      active: true,
+    });
+  },
+});
+
+export const createProjectTask = mutation({
+  args: {
+    projectId: v.id("roadmap_items"),
+    sprintId: v.id("roadmap_items"),
+    title: v.string(),
+    assigneeId: v.id("project_resources"),
+    phase: v.union(v.literal("pre_uat"), v.literal("post_uat")),
+    estimatedHours: v.number(),
+    actualHours: v.number(),
+    remainingHours: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await requireProjectCostAccess(ctx);
+    await requireProject(ctx, args.projectId);
+    const sprint = await ctx.db.get(args.sprintId);
+    if (
+      !sprint ||
+      sprint.level !== "sprint" ||
+      sprint.parentId !== args.projectId
+    )
+      domainError(
+        "VALIDATION_ERROR",
+        "Sprint must belong to Project ID",
+        "sprintId",
+      );
+    if (!(await ctx.db.get(args.assigneeId)))
+      domainError("NOT_FOUND", "Assignee not found", "assigneeId");
+    for (const [field, value] of [
+      ["estimatedHours", args.estimatedHours],
+      ["actualHours", args.actualHours],
+      ["remainingHours", args.remainingHours],
+    ] as const)
+      numberInRange(value, 0, Number.MAX_SAFE_INTEGER, field);
+    return await ctx.db.insert("project_tasks", {
+      ...args,
+      title: requiredText(args.title, "title"),
+    });
+  },
+});
+
+export const createProjectNonLaborCost = mutation({
+  args: {
+    projectId: v.id("roadmap_items"),
+    category: v.union(
+      v.literal("server"),
+      v.literal("domain"),
+      v.literal("license"),
+      v.literal("software"),
+      v.literal("outsource"),
+      v.literal("other"),
+    ),
+    costType: v.union(
+      v.literal("initial"),
+      v.literal("monthly"),
+      v.literal("annual"),
+    ),
+    amount: v.number(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireProjectCostAccess(ctx);
+    await requireProject(ctx, args.projectId);
+    numberInRange(args.amount, 0, Number.MAX_SAFE_INTEGER, "amount");
+    return await ctx.db.insert("project_non_labor_costs", {
+      ...args,
+      description: optionalText(args.description),
+    });
+  },
+});
+
+export const removeProjectNonLaborCost = mutation({
+  args: { id: v.id("project_non_labor_costs") },
+  handler: async (ctx, args) => {
+    await requireProjectCostAccess(ctx);
+    if (!(await ctx.db.get(args.id)))
+      domainError("NOT_FOUND", "Project cost not found", "id");
+    await ctx.db.delete(args.id);
   },
 });
