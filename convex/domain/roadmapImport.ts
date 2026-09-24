@@ -1,3 +1,5 @@
+import { isForbiddenRoadmapContent } from "./roadmap";
+
 // Parses a "Sprint → Luồng (workstream) → Task" Gantt sheet (as exported by
 // the external sprint-tracking spreadsheet) into a tree ready to import as
 // roadmap_items. Pure, source-format-agnostic: it consumes a plain
@@ -139,6 +141,10 @@ function formatTaskLine(row: ImportRow): string {
   return meta.length ? `• ${label} (${meta.join(" · ")})` : `• ${label}`;
 }
 
+function isForbiddenImportRow(row: ImportRow): boolean {
+  return isForbiddenRoadmapContent(row.title);
+}
+
 export function buildSprintImportTree(rows: ImportRow[]): SprintImport[] {
   const sprints: SprintImport[] = [];
   let currentSprint: SprintImport | null = null;
@@ -157,6 +163,16 @@ export function buildSprintImportTree(rows: ImportRow[]): SprintImport[] {
   };
 
   for (const row of rows) {
+    if (isForbiddenImportRow(row)) {
+      const kind = classifyWbs(row.wbs);
+      if (kind === "sprint") {
+        flushWorkstream();
+        currentSprint = null;
+      } else if (kind === "workstream") {
+        flushWorkstream();
+      }
+      continue;
+    }
     switch (classifyWbs(row.wbs)) {
       case "sprint":
         flushWorkstream();

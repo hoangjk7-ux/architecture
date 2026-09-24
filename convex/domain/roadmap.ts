@@ -36,6 +36,36 @@ export type RoadmapInput = {
   description?: string;
 };
 
+const forbiddenRoadmapPatterns = [
+  /sap\s*s\/4hana[\s\p{P}]*sd[\s\p{P}]*(module\s*)?(optimization|tuning)/iu,
+  /sd[\s\p{P}]*(module\s*)?(optimization|query\s*performance\s*tuning)/iu,
+  /api\s*gateway[\s\p{P}]*(production\s*)?hardening/iu,
+  /production\s*hardening/iu,
+  /api\s*gateway[\s\p{P}]*ha[\s\p{P}]*configuration/iu,
+];
+
+export function isForbiddenRoadmapContent(value: string | undefined): boolean {
+  return (
+    !!value && forbiddenRoadmapPatterns.some((pattern) => pattern.test(value))
+  );
+}
+
+export function assertAllowedRoadmapContent(
+  title: string,
+  description?: string,
+): void {
+  if (
+    isForbiddenRoadmapContent(title) ||
+    isForbiddenRoadmapContent(description)
+  ) {
+    domainError(
+      "VALIDATION_ERROR",
+      "Roadmap contains a retired demo item and cannot be imported",
+      "title",
+    );
+  }
+}
+
 export function normalizeRoadmapItem<T extends RoadmapInput>(input: T): T {
   const dates = orderedDates(input.startDate, input.dueDate);
   return {

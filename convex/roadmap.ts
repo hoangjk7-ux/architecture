@@ -15,6 +15,7 @@ import {
 } from "./domain/common.ts";
 import { calculateProjectCost } from "./domain/projectCosts.ts";
 import {
+  assertAllowedRoadmapContent,
   assertNoRoadmapCycle,
   assertRoadmapParent,
   normalizeRoadmapItem,
@@ -50,7 +51,7 @@ async function validateParent(
   itemId?: string,
 ) {
   if (!parentId) {
-    assertRoadmapParent(level, null);
+    (assertAllowedRoadmapContent, assertRoadmapParent(level, null));
     return;
   }
 
@@ -175,6 +176,7 @@ export const create = mutation({
   args: roadmapArgs,
   handler: async (ctx, args) => {
     await requireWriteAccess(ctx);
+    assertAllowedRoadmapContent(args.title, args.description);
     const data = await normalizeProjectSystem(ctx, normalizeRoadmapItem(args));
     await validateRelatedSystems(ctx, data.relatedSystemIds);
     await validateParent(ctx, data.level, data.parentId);
@@ -193,6 +195,7 @@ export const update = mutation({
       ctx,
       normalizeRoadmapItem(data),
     );
+    assertAllowedRoadmapContent(normalized.title, normalized.description);
     await validateRelatedSystems(ctx, normalized.relatedSystemIds);
     await validateParent(ctx, normalized.level, normalized.parentId, id);
     const children = await ctx.db
@@ -284,6 +287,7 @@ export const importSprints = mutation({
         relatedSystemIds: [],
         priority: "medium" as const,
       });
+      assertAllowedRoadmapContent(sprintData.title);
       assertRoadmapParent(sprintData.level, project.level);
       const sprintId = await ctx.db.insert("roadmap_items", sprintData);
       sprintsCreated += 1;
@@ -302,6 +306,10 @@ export const importSprints = mutation({
           description: workstream.description,
           priority: "medium" as const,
         });
+        assertAllowedRoadmapContent(
+          workstreamData.title,
+          workstreamData.description,
+        );
         assertRoadmapParent(workstreamData.level, sprintData.level);
         await ctx.db.insert("roadmap_items", workstreamData);
         workstreamsCreated += 1;

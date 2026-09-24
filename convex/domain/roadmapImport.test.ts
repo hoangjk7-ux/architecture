@@ -240,6 +240,18 @@ describe("buildSprintImportTree / parseSprintTimelineSheet", () => {
     expect(parseSprintTimelineSheet([])).toEqual([]);
   });
 
+  it("does not import retired demo roadmap names from Excel", () => {
+    const sprints = parseSprintTimelineSheet([
+      ["WBS", "Tên Nhiệm Vụ", "", "", "", "", "Trạng Thái"],
+      ["Sprint 1", "SAP S/4HANA SD Module Optimization", "", "", "", "", ""],
+      ["1", "API Gateway Production Hardening", "", "", "", "", ""],
+      ["2", "Luồng hợp lệ", "", "", "", "", ""],
+      ["2.1", "API Gateway HA Configuration", "", "", "", "", ""],
+    ]);
+
+    expect(sprints).toEqual([]);
+  });
+
   it("leaves description undefined for a workstream with no task rows", () => {
     const [sprint] = buildSprintImportTree([
       {
