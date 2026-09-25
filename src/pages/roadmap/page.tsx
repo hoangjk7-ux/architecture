@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createRoadmapForm, type RoadmapFormData } from "./form";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -89,33 +90,6 @@ const levelLabels: Record<RoadmapLevel, string> = {
   workstream: "Luồng công việc",
 };
 
-type RoadmapFormData = {
-  title: string;
-  level: RoadmapLevel;
-  parentId?: Id<"roadmap_items">;
-  status: RoadmapStatus;
-  owner: string;
-  startDate: string;
-  dueDate: string;
-  architectureAlignmentScore: number;
-  relatedSystemIds: Id<"software_systems">[];
-  description: string;
-  priority: RoadmapPriority;
-};
-
-const defaultForm: RoadmapFormData = {
-  title: "",
-  level: "initiative",
-  status: "not_started",
-  owner: "",
-  startDate: "",
-  dueDate: "",
-  architectureAlignmentScore: 80,
-  relatedSystemIds: [],
-  description: "",
-  priority: "medium",
-};
-
 function RoadmapForm({
   initial,
   items,
@@ -131,10 +105,7 @@ function RoadmapForm({
   onSave: (data: RoadmapFormData) => Promise<void>;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState<RoadmapFormData>({
-    ...defaultForm,
-    ...initial,
-  });
+  const [form, setForm] = useState(() => createRoadmapForm(initial));
   const [saving, setSaving] = useState(false);
   const set = <K extends keyof RoadmapFormData>(
     key: K,
