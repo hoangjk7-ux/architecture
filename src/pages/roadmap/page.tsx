@@ -148,14 +148,23 @@ function RoadmapForm({
         item.relatedSystemIds.some((systemId) => systemById.has(systemId))),
   );
   const handleSave = async () => {
-    if (!form.title.trim()) return toast.error("Title is required");
+    const title =
+      form.level === "project"
+        ? (systemById.get(form.relatedSystemIds[0])?.name ?? "")
+        : form.title.trim();
+    if (!title)
+      return toast.error(
+        form.level === "project"
+          ? "Hãy chọn hệ thống từ Kho hệ thống"
+          : "Title is required",
+      );
     if (form.level === "project" && form.relatedSystemIds.length !== 1)
       return toast.error("Hãy chọn một hệ thống cho dự án");
     if (parentLevelOf[form.level] && !form.parentId)
       return toast.error("Hãy chọn cấp cha");
     setSaving(true);
     try {
-      await onSave({ ...form, title: form.title.trim() });
+      await onSave({ ...form, title });
       onClose();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không thể lưu");
@@ -277,6 +286,12 @@ function RoadmapForm({
                 ))}
               </SelectContent>
             </Select>
+            {parentCandidates.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Chưa có {levelLabels[parentLevelOf[form.level]!]}. Hãy tạo cấp
+                cha trước khi lưu mục này.
+              </p>
+            )}
           </div>
         )}
         <div className="space-y-1">
@@ -508,6 +523,11 @@ function RoadmapContent() {
   const updateItem = useMutation(api.roadmap.update);
   const removeItem = useMutation(api.roadmap.remove);
   const [showForm, setShowForm] = useState(false);
+  const [newProject, setNewProject] = useState<Partial<RoadmapFormData>>();
+  const unplannedSystems = systems.filter(
+    (system) =>
+      !projects.some((project) => project.relatedSystemIds[0] === system._id),
+  );
   const [editing, setEditing] = useState<RoadmapItem | null>(null);
   const [taskSprint, setTaskSprint] = useState<RoadmapItem | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -615,13 +635,55 @@ function RoadmapContent() {
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Nhập Sprint từ Excel
             </Button>
-            <Button size="sm" onClick={() => setShowForm(true)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setNewProject(undefined);
+                setShowForm(true);
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add Item
             </Button>
           </div>
         )}
       </div>
+      {rawItems !== undefined && unplannedSystems.length > 0 && (
+        <section className="space-y-2 rounded-lg border p-4">
+          <h2 className="font-semibold">
+            Project từ Kho hệ thống chưa có kế hoạch ({unplannedSystems.length})
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Chọn hệ thống để lập kế hoạch. Ngày và trạng thái được nhập theo
+            thực tế triển khai.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {unplannedSystems.map((system) =>
+              canWrite ? (
+                <Button
+                  key={system._id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setNewProject({
+                      level: "project",
+                      title: system.name,
+                      relatedSystemIds: [system._id],
+                    });
+                    setShowForm(true);
+                  }}
+                >
+                  {system.name} · Lập kế hoạch
+                </Button>
+              ) : (
+                <Badge key={system._id} variant="secondary">
+                  {system.name} · Chưa có kế hoạch
+                </Badge>
+              ),
+            )}
+          </div>
+        </section>
+      )}
       {stats && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {[
@@ -697,6 +759,7 @@ function RoadmapContent() {
             <DialogTitle>Add Roadmap Item</DialogTitle>
           </DialogHeader>
           <RoadmapForm
+            initial={newProject}
             items={items}
             systems={systems}
             resources={master?.resources ?? []}

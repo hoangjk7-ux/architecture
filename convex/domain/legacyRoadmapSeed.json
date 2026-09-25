@@ -1,0 +1,212 @@
+[
+  {
+    "level": "initiative",
+    "status": "in_progress",
+    "owner": "CTO Office",
+    "startDate": "2025-01-01",
+    "dueDate": "2026-12-31",
+    "architectureAlignmentScore": 90,
+    "priority": "high",
+    "description": "Modernize the core ERP landscape by completing Oracle EBS sunset, upgrading SAP S/4HANA, and establishing an enterprise integration platform."
+  },
+  {
+    "level": "initiative",
+    "status": "in_progress",
+    "owner": "Chief Data Officer",
+    "startDate": "2025-03-01",
+    "dueDate": "2026-06-30",
+    "architectureAlignmentScore": 85,
+    "priority": "high",
+    "description": "Build a unified data platform enabling real-time analytics, self-service BI, and AI-powered insights across the organization."
+  },
+  {
+    "level": "initiative",
+    "status": "not_started",
+    "owner": "VP Customer Success",
+    "startDate": "2025-07-01",
+    "dueDate": "2026-09-30",
+    "architectureAlignmentScore": 78,
+    "priority": "medium",
+    "description": "Elevate customer-facing digital experiences through CRM optimization, AI-driven personalization, and self-service portal expansion."
+  },
+  {
+    "level": "program",
+    "status": "in_progress",
+    "owner": "Nguyen Van An",
+    "startDate": "2025-01-01",
+    "dueDate": "2026-06-30",
+    "architectureAlignmentScore": 88,
+    "priority": "high",
+    "description": "Complete Oracle EBS decommission and deliver SAP S/4HANA enhancements to support Campus B operations."
+  },
+  {
+    "level": "program",
+    "status": "in_progress",
+    "owner": "Nguyen Thanh Long",
+    "startDate": "2025-02-01",
+    "dueDate": "2026-03-31",
+    "architectureAlignmentScore": 82,
+    "priority": "high",
+    "description": "Establish a centralized API gateway and event bus to replace point-to-point integrations."
+  },
+  {
+    "level": "program",
+    "status": "in_progress",
+    "owner": "Do Thi Mai",
+    "startDate": "2025-03-01",
+    "dueDate": "2025-12-31",
+    "architectureAlignmentScore": 87,
+    "priority": "high",
+    "description": "Migrate all data pipelines to Snowflake and roll out Power BI self-service analytics."
+  },
+  {
+    "level": "program",
+    "status": "not_started",
+    "owner": "Tran Thi Bich",
+    "startDate": "2025-08-01",
+    "dueDate": "2026-06-30",
+    "architectureAlignmentScore": 75,
+    "priority": "medium",
+    "description": "Implement Einstein AI features and expand Salesforce Service Cloud capabilities."
+  },
+  {
+    "level": "project",
+    "status": "in_progress",
+    "owner": "Pham Quoc Hung",
+    "startDate": "2025-04-01",
+    "dueDate": "2025-09-30",
+    "architectureAlignmentScore": 95,
+    "priority": "high",
+    "description": "Final data migration from Oracle EBS to SAP S/4HANA, user acceptance testing, and system shutdown on Campus B."
+  },
+  {
+    "level": "project",
+    "status": "in_progress",
+    "owner": "Nguyen Van An",
+    "startDate": "2025-05-01",
+    "dueDate": "2025-10-31",
+    "architectureAlignmentScore": 80,
+    "priority": "high",
+    "description": "Resolve SD module performance bottlenecks and implement order processing improvements."
+  },
+  {
+    "level": "project",
+    "status": "not_started",
+    "owner": "Nguyen Van An",
+    "startDate": "2025-09-01",
+    "dueDate": "2026-03-31",
+    "architectureAlignmentScore": 82,
+    "priority": "medium",
+    "description": "Deploy S/4HANA embedded analytics for Finance and Operations, reducing dependency on external reporting tools."
+  },
+  {
+    "level": "project",
+    "status": "in_progress",
+    "owner": "Nguyen Thanh Long",
+    "startDate": "2025-02-01",
+    "dueDate": "2025-07-31",
+    "architectureAlignmentScore": 88,
+    "priority": "high",
+    "description": "Implement HA/DR for API gateway, complete API analytics module, and onboard all tier-1 integrations."
+  },
+  {
+    "level": "project",
+    "status": "not_started",
+    "owner": "Nguyen Thanh Long",
+    "startDate": "2025-08-01",
+    "dueDate": "2026-03-31",
+    "architectureAlignmentScore": 76,
+    "priority": "medium",
+    "description": "Migrate remaining direct DB-link and ETL integrations to go through the central API gateway."
+  },
+  {
+    "level": "project",
+    "status": "done",
+    "owner": "Do Thi Mai",
+    "startDate": "2025-03-01",
+    "dueDate": "2025-05-31",
+    "architectureAlignmentScore": 90,
+    "priority": "high",
+    "description": "Complete migration of legacy SQL Server DW to Snowflake and validate all ELT pipelines."
+  },
+  {
+    "level": "project",
+    "status": "in_progress",
+    "owner": "Le Minh Duc",
+    "startDate": "2025-06-01",
+    "dueDate": "2025-11-30",
+    "architectureAlignmentScore": 85,
+    "priority": "medium",
+    "description": "Deploy Power BI premium capacity, establish data governance policies, and train 200+ business users."
+  },
+  {
+    "level": "project",
+    "status": "not_started",
+    "owner": "Do Thi Mai",
+    "startDate": "2025-09-01",
+    "dueDate": "2025-12-31",
+    "architectureAlignmentScore": 83,
+    "priority": "medium",
+    "description": "Build HR analytics dashboards covering headcount, attrition, and learning metrics in Power BI."
+  },
+  {
+    "level": "project",
+    "status": "not_started",
+    "owner": "Tran Thi Bich",
+    "startDate": "2025-10-01",
+    "dueDate": "2026-03-31",
+    "architectureAlignmentScore": 72,
+    "priority": "medium",
+    "description": "Configure and train Salesforce Einstein AI lead scoring model using 3 years of historical win/loss data."
+  },
+  {
+    "level": "project",
+    "status": "not_started",
+    "owner": "Vu Thi Ngoc",
+    "startDate": "2025-08-01",
+    "dueDate": "2026-06-30",
+    "architectureAlignmentScore": 70,
+    "priority": "medium",
+    "description": "Expand pilot portal to full production: order tracking, returns management, and live chat support."
+  },
+  {
+    "level": "epic",
+    "status": "done",
+    "owner": "Pham Quoc Hung",
+    "startDate": "2025-04-01",
+    "dueDate": "2025-06-30",
+    "architectureAlignmentScore": 95,
+    "priority": "high",
+    "description": "Extract, transform, and load General Ledger and Accounts Payable historical data from Oracle EBS to SAP."
+  },
+  {
+    "level": "epic",
+    "status": "in_progress",
+    "owner": "Pham Quoc Hung",
+    "startDate": "2025-07-01",
+    "dueDate": "2025-09-15",
+    "architectureAlignmentScore": 92,
+    "priority": "high",
+    "description": "3-month parallel run of Oracle EBS and SAP S/4HANA Finance modules with user acceptance testing."
+  },
+  {
+    "level": "epic",
+    "status": "not_started",
+    "owner": "Vu Thi Ngoc",
+    "startDate": "2025-08-01",
+    "dueDate": "2025-10-31",
+    "architectureAlignmentScore": 68,
+    "priority": "medium",
+    "description": "Integrate customer portal with Azure AD B2C for federated SSO using existing Microsoft 365 tenant."
+  },
+  {
+    "level": "project",
+    "status": "blocked",
+    "owner": "Hoang Kim Lan",
+    "startDate": "2025-04-01",
+    "dueDate": "2025-08-31",
+    "architectureAlignmentScore": 65,
+    "priority": "medium",
+    "description": "Clean and enrich 4,000+ CMDB records. Blocked pending resource allocation from IT Ops team."
+  }
+]

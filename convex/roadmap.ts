@@ -1,7 +1,8 @@
 import { mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { roadmapView } from "./domain/roadmapView";
 import {
   requireProjectCostAccess,
   requireReadAccess,
@@ -51,7 +52,7 @@ async function validateParent(
   itemId?: string,
 ) {
   if (!parentId) {
-    (assertAllowedRoadmapContent, assertRoadmapParent(level, null));
+    assertRoadmapParent(level, null);
     return;
   }
 
@@ -130,25 +131,19 @@ const roadmapArgs = {
   priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
 };
 
+async function listPlans(ctx: QueryCtx) {
+  const [items, systems] = await Promise.all([
+    ctx.db.query("roadmap_items").collect(),
+    ctx.db.query("software_systems").collect(),
+  ]);
+  return roadmapView(items, systems);
+}
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
     await requireReadAccess(ctx);
-    const [items, systems] = await Promise.all([
-      ctx.db.query("roadmap_items").collect(),
-      ctx.db.query("software_systems").collect(),
-    ]);
-    const systemNames = new Map(
-      systems.map((system) => [system._id, system.name]),
-    );
-    return items.map((item) =>
-      item.level === "project"
-        ? {
-            ...item,
-            title: systemNames.get(item.relatedSystemIds[0]) ?? item.title,
-          }
-        : item,
-    );
+    return await listPlans(ctx);
   },
 });
 
@@ -176,8 +171,8 @@ export const create = mutation({
   args: roadmapArgs,
   handler: async (ctx, args) => {
     await requireWriteAccess(ctx);
-    assertAllowedRoadmapContent(args.title, args.description);
-    const data = await normalizeProjectSystem(ctx, normalizeRoadmapItem(args));
+    const data = normalizeRoadmapItem(await normalizeProjectSystem(ctx, args));
+    assertAllowedRoadmapContent(data.title, data.description);
     await validateRelatedSystems(ctx, data.relatedSystemIds);
     await validateParent(ctx, data.level, data.parentId);
     return await ctx.db.insert("roadmap_items", data);
@@ -191,9 +186,8 @@ export const update = mutation({
     const { id, ...data } = args;
     if (!(await ctx.db.get(id)))
       domainError("NOT_FOUND", "Roadmap item not found", "id");
-    const normalized = await normalizeProjectSystem(
-      ctx,
-      normalizeRoadmapItem(data),
+    const normalized = normalizeRoadmapItem(
+      await normalizeProjectSystem(ctx, data),
     );
     assertAllowedRoadmapContent(normalized.title, normalized.description);
     await validateRelatedSystems(ctx, normalized.relatedSystemIds);
@@ -273,6 +267,8 @@ export const importSprints = mutation({
       );
     }
 
+    await validateParent(ctx, "sprint", args.projectId);
+
     let sprintsCreated = 0;
     let workstreamsCreated = 0;
     for (const sprint of args.sprints) {
@@ -323,7 +319,7 @@ export const getStats = query({
   args: {},
   handler: async (ctx) => {
     await requireReadAccess(ctx);
-    const items = await ctx.db.query("roadmap_items").collect();
+    const items = await listPlans(ctx);
     const projects = items.filter((i) => i.level === "project");
     const now = new Date().toISOString().split("T")[0];
     return {
